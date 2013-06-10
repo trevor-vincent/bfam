@@ -9,7 +9,7 @@
  */
 typedef struct bfam_ts
 {
-  bfam_domain_t* domain;         /**< my domain */
+  bfam_domain_t* dom;         /**< my domain */
 } bfam_ts_t;
 
 /** initialize a time step routine
