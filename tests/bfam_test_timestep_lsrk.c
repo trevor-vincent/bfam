@@ -21,7 +21,7 @@ void update_rates(bfam_subdomain_t** subdomains_,void* dq_, const void* q_,
   for(bfam_locidx_t s;subdomains[s];s++)
   {
     bfam_subdomain_dummy_t *sub = subdomains[s];
-    dq[s] += sub->N*pow(q[s],sub->N+1.0);
+    dq[s] += sub->N*pow(t,sub->N-1.0);
   }
 }
 
