@@ -25,6 +25,8 @@ typedef struct bfam_ts_lsrk
   bfam_subdomain_t ** subdomains; /**< subdomains to handle */
   void             ** fields;     /**< pointers to the fields I handle */
   void             ** rates;      /**< pointers to the my rates */
+  bfam_locidx_t    numSubdomains; /**< number of subdomains I handle */
+  bfam_locidx_t    numFields;     /**< number of fields I handle */
   /**< Function pointer for scale rates. s is a null terminated array of
    * subdomains. dq := a*dq */
   void (*scale_rates) (bfam_subdomain_t** s,void** dq, const bfam_real_t a);

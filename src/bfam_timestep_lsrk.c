@@ -41,34 +41,34 @@ bfam_ts_lsrk_init(bfam_ts_lsrk_t* ts, bfam_domain_t* dom,
   ts->subdomains = bfam_malloc(
       (dom->numSubdomains + 1)*sizeof(bfam_subdomain_t*));
 
-  bfam_locidx_t numSubdomains = 0;
+  ts->numSubdomains = 0;
   bfam_domain_get_subdomains(ts->base.dom,match,tags,
-     ts->base.dom->numSubdomains,ts->subdomains,&numSubdomains);
-  ts->subdomains[numSubdomains] = NULL;
+     ts->base.dom->numSubdomains,ts->subdomains,&ts->numSubdomains);
+  ts->subdomains[ts->numSubdomains] = NULL;
 
   /* set up the rate fields and get number of fields */
-  int numFields = 0;
+  ts->numFields = 0;
   char pname[BFAM_BUFSIZ];
-  while(fields[numFields])
+  while(fields[ts->numFields])
   {
-    snprintf(pname,BFAM_BUFSIZ,"_%s_lsrk_rate",fields[numFields]);
+    snprintf(pname,BFAM_BUFSIZ,"_%s_lsrk_rate",fields[ts->numFields]);
     bfam_domain_add_field(dom,match,tags,pname);
-    numFields++;
+    ts->numFields++;
   }
 
   /* create storage for fields and rates */
-  ts->fields = bfam_malloc(numFields*numSubdomains*sizeof(void*));
-  ts->rates  = bfam_malloc(numFields*numSubdomains*sizeof(void*));
+  ts->fields = bfam_malloc(ts->numFields*ts->numSubdomains*sizeof(void*));
+  ts->rates  = bfam_malloc(ts->numFields*ts->numSubdomains*sizeof(void*));
 
   /* store the ponters to the fields and rates in the user order */
-  for(int s = 0;s < numSubdomains;s++)
+  for(int s = 0;s < ts->numSubdomains;s++)
   {
-    for(int f = 0; f < numFields;f++)
+    for(int f = 0; f < ts->numFields;f++)
     {
-      ts->fields[s*numFields+f] =
+      ts->fields[s*ts->numFields+f] =
         bfam_dictionary_get_value_ptr(&ts->subdomains[s]->fields,fields[f]);
       snprintf(pname,BFAM_BUFSIZ,"_%s_lsrk_rate",fields[f]);
-      ts->rates[s*numFields+f] =
+      ts->rates[s*ts->numFields+f] =
         bfam_dictionary_get_value_ptr(&ts->subdomains[s]->fields,pname);
     }
   }
