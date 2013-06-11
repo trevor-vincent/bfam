@@ -4,11 +4,11 @@ bfam_ts_lsrk_t*
 bfam_ts_lsrk_new(bfam_domain_t* dom, bfam_ts_lsrk_method_t method,
     const char* tags[], bfam_domain_match_t match,
     const char* fields[],
-    void (*scale_rates) (bfam_subdomain_t**,void**,bfam_real_t),
-    void (*update_rates) (bfam_subdomain_t**,void**,const void**,
+    void (*scale_rates) (bfam_subdomain_t**,void*,bfam_real_t),
+    void (*update_rates) (bfam_subdomain_t**,void*,const void*,
       const bfam_real_t),
-    void (*scale_add_rates) (bfam_subdomain_t**,void**,
-      const void**, const bfam_real_t))
+    void (*scale_add_rates) (bfam_subdomain_t**,void*,
+      const void*, const bfam_real_t))
 {
   bfam_ts_lsrk_t* newTS = bfam_malloc(sizeof(bfam_ts_lsrk_t));
   bfam_ts_lsrk_init(newTS, dom,
@@ -22,11 +22,11 @@ bfam_ts_lsrk_init(bfam_ts_lsrk_t* ts, bfam_domain_t* dom,
     bfam_ts_lsrk_method_t method,
     const char* tags[], bfam_domain_match_t match,
     const char* fields[],
-    void (*scale_rates) (bfam_subdomain_t**,void**,bfam_real_t),
-    void (*update_rates) (bfam_subdomain_t**,void**,const void**,
+    void (*scale_rates) (bfam_subdomain_t**,void*,bfam_real_t),
+    void (*update_rates) (bfam_subdomain_t**,void*,const void*,
       const bfam_real_t),
-    void (*scale_add_rates) (bfam_subdomain_t**,void**,
-      const void**, const bfam_real_t))
+    void (*scale_add_rates) (bfam_subdomain_t**,void*,
+      const void*, const bfam_real_t))
 {
   bfam_ts_init(&ts->base, dom);
 

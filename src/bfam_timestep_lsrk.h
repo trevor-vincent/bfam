@@ -29,15 +29,15 @@ typedef struct bfam_ts_lsrk
   bfam_locidx_t    numFields;     /**< number of fields I handle */
   /**< Function pointer for scale rates. s is a null terminated array of
    * subdomains. dq := a*dq */
-  void (*scale_rates) (bfam_subdomain_t** s,void** dq, const bfam_real_t a);
+  void (*scale_rates) (bfam_subdomain_t** s,void* dq, const bfam_real_t a);
   /**< Function pointer for update rates. s is a null terminated array of
    * subdomains. dq := dq + RHS(q,t) */
-  void (*update_rates) (bfam_subdomain_t** s,void** dq,
-      const void** q, const bfam_real_t t);
+  void (*update_rates) (bfam_subdomain_t** s,void* dq,
+      const void* q, const bfam_real_t t);
   /**< Function pointer for scale and add rates. s is a null terminated array of
    * subdomains. q := q + b*dq */
-  void (*scale_add_rates) (bfam_subdomain_t** s,void** q,
-      const void** dq, const bfam_real_t b);
+  void (*scale_add_rates) (bfam_subdomain_t** s,void* q,
+      const void* dq, const bfam_real_t b);
 } bfam_ts_lsrk_t;
 
 typedef enum bfam_ts_lsrk_method
@@ -74,11 +74,11 @@ bfam_ts_lsrk_t*
 bfam_ts_lsrk_new(bfam_domain_t* dom, bfam_ts_lsrk_method_t method,
     const char* tags[], bfam_domain_match_t match,
     const char* fields[],
-    void (*scale_rates) (bfam_subdomain_t**,void**,const bfam_real_t),
-    void (*update_rates) (bfam_subdomain_t**,void**,const void**,
+    void (*scale_rates) (bfam_subdomain_t**,void*,const bfam_real_t),
+    void (*update_rates) (bfam_subdomain_t**,void*,const void*,
       const bfam_real_t),
-    void (*scale_add_rates) (bfam_subdomain_t**,void**,
-      const void**, const bfam_real_t));
+    void (*scale_add_rates) (bfam_subdomain_t**,void*,
+      const void*, const bfam_real_t));
 
 /** initialize a low storage RK scheme
  *
@@ -106,11 +106,11 @@ bfam_ts_lsrk_init(bfam_ts_lsrk_t* ts, bfam_domain_t* dom,
     bfam_ts_lsrk_method_t method,
     const char* tags[], bfam_domain_match_t match,
     const char* fields[],
-    void (*scale_rates) (bfam_subdomain_t**,void**,const bfam_real_t),
-    void (*update_rates) (bfam_subdomain_t**,void**,const void**,
+    void (*scale_rates) (bfam_subdomain_t**,void*,const bfam_real_t),
+    void (*update_rates) (bfam_subdomain_t**,void*,const void*,
       const bfam_real_t),
-    void (*scale_add_rates) (bfam_subdomain_t**,void**,
-      const void**, const bfam_real_t));
+    void (*scale_add_rates) (bfam_subdomain_t**,void*,
+      const void*, const bfam_real_t));
 
 /** free a low storage RK scheme
  *
