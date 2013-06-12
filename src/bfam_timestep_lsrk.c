@@ -156,4 +156,8 @@ bfam_ts_lsrk_add_subdomains(bfam_ts_lsrk_t *ts, bfam_domain_match_t match,
   void (*add_rates) (bfam_subdomain_t *thisSubdomain, void *fields,
       const void *rates, const bfam_real_t a))
 {
+  bfam_domain_t *dom = ts->base.domain;
+  bfam_subdomain_t *subs[dom->numSubdomains+1];
+  bfam_locidx_t numSubs = 0;
+  bfam_domain_get_subdomains(dom,match,tags,dom->numSubdomains,subs,&numSubs);
 }
