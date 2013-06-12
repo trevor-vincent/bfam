@@ -23,6 +23,8 @@ bfam_subdomain_dummy_field_add(bfam_subdomain_t *subdomain, const char *name)
   size_t fieldSize = sizeof(bfam_real_t);
   bfam_real_t *field = bfam_malloc_aligned(fieldSize);
 
+  *field = 0;
+
   int rval = bfam_dictionary_insert_ptr(&s->base.fields, name, field);
 
   BFAM_ASSERT(rval != 1);
@@ -46,8 +48,7 @@ bfam_subdomain_dummy_init(bfam_subdomain_dummy_t       *subdomain,
 }
 
 static int
-bfam_subdomain_dummy_free_fields(const char * key, const void *val,
-    void *arg)
+bfam_subdomain_dummy_free_fields(const char * key, void *val, void *arg)
 {
   bfam_free_aligned(val);
 
