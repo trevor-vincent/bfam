@@ -385,32 +385,32 @@ setup_subdomains(bfam_domain_t *domain,
             }
             else
             {
-              int m_mask = 0;
-              switch(face)
-              {
-                case 0:
-                case 1:
-                  m_mask = 1;
-                  break;
-                case 2:
-                case 3:
-                  m_mask = 0;
-                  break;
-              }
-              int n_mask = 0;
-              switch(n_face)
-              {
-                case 0:
-                case 1:
-                  n_mask = 1;
-                  break;
-                case 2:
-                case 3:
-                  n_mask = 0;
-                  break;
-              }
               if(dim == 2)
               {
+                int m_mask = 0;
+                switch(face)
+                {
+                  case 0:
+                  case 1:
+                    m_mask = 1;
+                    break;
+                  case 2:
+                  case 3:
+                    m_mask = 0;
+                    break;
+                }
+                int n_mask = 0;
+                switch(n_face)
+                {
+                  case 0:
+                  case 1:
+                    n_mask = 1;
+                    break;
+                  case 2:
+                  case 3:
+                    n_mask = 0;
+                    break;
+                }
                 int n_pd[2] = {0,0};
                 bfam_locidx_t n_size = procs[2*neigh+1]-procs[2*neigh]+1;
                 BFAM_MPI_CHECK(MPI_Dims_create(n_size, 2, n_pd));
@@ -479,26 +479,91 @@ setup_subdomains(bfam_domain_t *domain,
               }
               else
               {
+                int m_mask[2] = {0,0};
+                switch(face)
+                {
+                  case 0:
+                  case 1:
+                    m_mask[0] = 1;
+                    m_mask[1] = 2;
+                    break;
+                  case 2:
+                  case 3:
+                    m_mask[0] = 0;
+                    m_mask[1] = 2;
+                    break;
+                  case 4:
+                  case 5:
+                    m_mask[0] = 0;
+                    m_mask[1] = 1;
+                    break;
+                }
+                int n_mask[2] = {0,0};
+                switch(face)
+                {
+                  case 0:
+                  case 1:
+                    n_mask[0] = 1;
+                    n_mask[1] = 2;
+                    break;
+                  case 2:
+                  case 3:
+                    n_mask[0] = 0;
+                    n_mask[1] = 2;
+                    break;
+                  case 4:
+                  case 5:
+                    n_mask[0] = 0;
+                    n_mask[1] = 1;
+                    break;
+                }
+                bfam_gloidx_t n_N[2] =
+                   {N[dim*neigh + n_mask[0]],N[dim*neigh + n_mask[1]]};
+                bfam_gloidx_t m_N[2] =
+                   {N[dim*b + m_mask[0]],N[dim*b + m_mask[1]]};
+
                 int n_pd[3] = {0,0,0};
                 bfam_locidx_t n_size = procs[2*neigh+1]-procs[2*neigh]+1;
                 BFAM_MPI_CHECK(MPI_Dims_create(n_size, 3, n_pd));
-                switch(BFAM_P8EST_ORIENTATION(face,n_face,orient))
+                orient = BFAM_P8EST_ORIENTATION(face,n_face,orient);
+
+                switch(orient)
                 {
                   case 0:
+                    BFAM_ABORT_IF_NOT(m_N[0] == n_N[0] && m_N[1] == n_N[1],
+                        "Cannot connect %3d face %3d of size (%d,%d) with "
+                        "%3d face %3d of size (%d,%3d) with orientation %d. "
+                        "Non-conforming not implemented.",
+                        b,face,m_N[0],m_N[1],
+                        neigh,n_face,n_N[0],n_N[1],
+                        orient);
                     break;
                   case 1:
-                    break;
-                  case 2:
+                    BFAM_ABORT_IF_NOT(m_N[1] == n_N[0] && m_N[0] == n_N[1],
+                        "Cannot connect %3d face %3d of size (%d,%d) with "
+                        "%3d face %3d of size (%d,%3d) with orientation %d. "
+                        "Non-conforming not implemented.",
+                        b,face,m_N[0],m_N[1],
+                        neigh,n_face,n_N[0],n_N[1],orient);
                     break;
                   case 3:
+                    BFAM_ABORT_IF_NOT(m_N[1] == n_N[0] && m_N[0] == n_N[1],
+                        "Cannot connect %3d face %3d of size (%d,%d) with "
+                        "%3d face %3d of size (%d,%3d) with orientation %d. "
+                        "Non-conforming not implemented.",
+                        b,face,m_N[0],m_N[1],
+                        neigh,n_face,n_N[0],n_N[1],orient);
                     break;
                   case 4:
+                    BFAM_ABORT_IF_NOT(m_N[1] == n_N[0] && m_N[0] == n_N[1],
+                        "Cannot connect %3d face %3d of size (%d,%d) with "
+                        "%3d face %3d of size (%d,%3d) with orientation %d. "
+                        "Non-conforming not implemented.",
+                        b,face,m_N[0],m_N[1],
+                        neigh,n_face,n_N[0],n_N[1],orient);
                     break;
-                  case 5:
-                    break;
-                  case 6:
-                    break;
-                  case 7:
+                  default:
+                    BFAM_ABORT("orientation %d: not implemented yet",orient);
                     break;
                 }
               }
@@ -640,8 +705,7 @@ test_3d(int rank, int mpi_size, MPI_Comm mpicomm)
   bfam_domain_t domain;
   bfam_domain_init(&domain,MPI_COMM_WORLD);
 
-  int foo   = 15;
-  int dim   =  3;
+  int dim   = 3;
 
   const char *names[] = {"sub0","sub1","sub2","sub3","sub4","sub5"};
   bfam_locidx_t bufsz = 3;
@@ -657,12 +721,12 @@ test_3d(int rank, int mpi_size, MPI_Comm mpicomm)
     21, 20, 25, 24, 14, 10, 11, 12,
   };
   const bfam_gloidx_t N[6 * 3] = {
-     1+foo, 2+foo, 3+foo,
-     4+foo, 5+foo, 6+foo,
-     7+foo, 8+foo, 9+foo,
-    10+foo,11+foo,12+foo,
-    13+foo,14+foo,15+foo,
-    16+foo,17+foo,18+foo
+    11,11,11,
+    11,11,11,
+    11,11,11,
+    11,11,11,
+    11,11,11,
+    11,11,11,
   };
   const bfam_locidx_t EToE[6 * 6] = {
     0, 2, 0, 0, 0, 3,
@@ -754,6 +818,251 @@ test_3d(int rank, int mpi_size, MPI_Comm mpicomm)
   bfam_domain_free(&domain);
 }
 
+void
+test_3d_2block(int rank, int mpi_size, MPI_Comm mpicomm,
+    int face0,int face1,int rot)
+{
+  /* setup the domain*/
+  bfam_domain_t domain;
+  bfam_domain_init(&domain,MPI_COMM_WORLD);
+
+  int dim   = 3;
+
+  char *names[2];
+  char sub0[BFAM_BUFSIZ];
+  char sub1[BFAM_BUFSIZ];
+  names[0] = sub0;
+  names[1] = sub1;
+
+  snprintf(names[0],BFAM_BUFSIZ,"sub0_face%d_rot%d",face0,rot);
+  snprintf(names[1],BFAM_BUFSIZ,"sub1_face%d_rot%d",face1,rot);
+
+  bfam_locidx_t bufsz = 3;
+
+  bfam_locidx_t num_blocks = 2;
+  const bfam_long_real_t Vx[12] = {
+    0,1,2,
+    0,1,2,
+    0,1,2,
+    0,1,2
+  };
+  const bfam_long_real_t Vy[12] = {
+    0,0,0,
+    1,1,1,
+    0,0,0,
+    1,1,1
+  };
+  const bfam_long_real_t Vz[12] = {
+    0,0,0,
+    0,0,0,
+    1,1,1,
+    1,1,1
+  };
+
+  bfam_locidx_t EToV[2 * 8];
+
+  switch(face0)
+  {
+    case 0:
+      EToV[0] =  4;
+      EToV[1] =  3;
+      EToV[2] =  1;
+      EToV[3] =  0;
+      EToV[4] = 10;
+      EToV[5] =  9;
+      EToV[6] =  7;
+      EToV[7] =  6;
+      break;
+    case 1:
+      EToV[0] =  0;
+      EToV[1] =  1;
+      EToV[2] =  3;
+      EToV[3] =  4;
+      EToV[4] =  6;
+      EToV[5] =  7;
+      EToV[6] =  9;
+      EToV[7] = 10;
+      break;
+    case 2:
+      EToV[0] =  1;
+      EToV[1] =  4;
+      EToV[2] =  0;
+      EToV[3] =  3;
+      EToV[4] =  7;
+      EToV[5] = 10;
+      EToV[6] =  6;
+      EToV[7] =  9;
+      break;
+    case 3:
+      EToV[0] =  3;
+      EToV[1] =  0;
+      EToV[2] =  4;
+      EToV[3] =  1;
+      EToV[4] =  9;
+      EToV[5] =  6;
+      EToV[6] = 10;
+      EToV[7] =  7;
+      break;
+    case 4:
+      EToV[0] =  1;
+      EToV[1] =  7;
+      EToV[2] =  4;
+      EToV[3] = 10;
+      EToV[4] =  0;
+      EToV[5] =  6;
+      EToV[6] =  3;
+      EToV[7] =  9;
+      break;
+    case 5:
+      EToV[0] =  3;
+      EToV[1] =  9;
+      EToV[2] =  0;
+      EToV[3] =  6;
+      EToV[4] =  4;
+      EToV[5] = 10;
+      EToV[6] =  1;
+      EToV[7] =  7;
+      break;
+  }
+
+  switch(face1)
+  {
+    case 1:
+      EToV[8+0] =  4+1;
+      EToV[8+1] =  3+1;
+      EToV[8+2] =  1+1;
+      EToV[8+3] =  0+1;
+      EToV[8+4] = 10+1;
+      EToV[8+5] =  9+1;
+      EToV[8+6] =  7+1;
+      EToV[8+7] =  6+1;
+      break;
+    case 0:
+      EToV[8+0] =  0+1;
+      EToV[8+1] =  1+1;
+      EToV[8+2] =  3+1;
+      EToV[8+3] =  4+1;
+      EToV[8+4] =  6+1;
+      EToV[8+5] =  7+1;
+      EToV[8+6] =  9+1;
+      EToV[8+7] = 10+1;
+      break;
+    case 3:
+      EToV[8+0] =  1+1;
+      EToV[8+1] =  4+1;
+      EToV[8+2] =  0+1;
+      EToV[8+3] =  3+1;
+      EToV[8+4] =  7+1;
+      EToV[8+5] = 10+1;
+      EToV[8+6] =  6+1;
+      EToV[8+7] =  9+1;
+      break;
+    case 2:
+      EToV[8+0] =  3+1;
+      EToV[8+1] =  0+1;
+      EToV[8+2] =  4+1;
+      EToV[8+3] =  1+1;
+      EToV[8+4] =  9+1;
+      EToV[8+5] =  6+1;
+      EToV[8+6] = 10+1;
+      EToV[8+7] =  7+1;
+      break;
+    case 5:
+      EToV[8+0] =  1+1;
+      EToV[8+1] =  7+1;
+      EToV[8+2] =  4+1;
+      EToV[8+3] = 10+1;
+      EToV[8+4] =  0+1;
+      EToV[8+5] =  6+1;
+      EToV[8+6] =  3+1;
+      EToV[8+7] =  9+1;
+      break;
+    case 4:
+      EToV[8+0] =  3+1;
+      EToV[8+1] =  9+1;
+      EToV[8+2] =  0+1;
+      EToV[8+3] =  6+1;
+      EToV[8+4] =  4+1;
+      EToV[8+5] = 10+1;
+      EToV[8+6] =  1+1;
+      EToV[8+7] =  7+1;
+      break;
+  }
+
+  bfam_locidx_t EToE[2 * 6] = {
+    0,0,0,0,0,0,
+    1,1,1,1,1,1,
+  };
+
+  int8_t EToF[2 * 6] = {
+    0,1,2,3,4,5,
+    0,1,2,3,4,5,
+  };
+
+  bfam_gloidx_t N[2 * 3] = {
+    50,75,100,
+    125,150,175,
+  };
+
+
+  bfam_locidx_t  procs[2*num_blocks];
+
+  /* load balance */
+  simple_load_balance(procs,N,mpi_size,num_blocks,dim);
+
+  /* setup subdomains */
+  setup_subdomains(&domain,dim,num_blocks,bufsz,rank,
+      (const char**)names,procs,EToV,EToE,EToF,N,Vx,Vy,Vz);
+
+  //JK /* put in some fields */
+  //JK const char *volume[] = {"_volume", NULL};
+  //JK bfam_domain_add_field(&domain, BFAM_DOMAIN_OR, volume, "p1");
+  //JK bfam_domain_add_field(&domain, BFAM_DOMAIN_OR, volume, "p2");
+  //JK bfam_domain_add_field(&domain, BFAM_DOMAIN_OR, volume, "p3");
+
+  //JK bfam_domain_init_field(&domain, BFAM_DOMAIN_OR, volume, "p1",
+  //JK     0, poly1_field, NULL);
+  //JK bfam_domain_init_field(&domain, BFAM_DOMAIN_OR, volume, "p2",
+  //JK     0, poly2_field, NULL);
+  //JK bfam_domain_init_field(&domain, BFAM_DOMAIN_OR, volume, "p3",
+  //JK     0, poly3_field, NULL);
+
+
+  //JK const char *glue[] = {"_intra_glue", NULL};
+  //JK bfam_domain_add_minus_field(&domain, BFAM_DOMAIN_OR, glue, "p1");
+  //JK bfam_domain_add_minus_field(&domain, BFAM_DOMAIN_OR, glue, "p2");
+  //JK bfam_domain_add_minus_field(&domain, BFAM_DOMAIN_OR, glue, "p3");
+
+  //JK bfam_domain_add_plus_field(&domain, BFAM_DOMAIN_OR, glue, "p1");
+  //JK bfam_domain_add_plus_field(&domain, BFAM_DOMAIN_OR, glue, "p2");
+  //JK bfam_domain_add_plus_field(&domain, BFAM_DOMAIN_OR, glue, "p3");
+
+  //JK bfam_communicator_t* communicator =
+  //JK   bfam_communicator_new(&domain, BFAM_DOMAIN_OR, glue,
+  //JK       mpicomm, 10);
+
+  //JK /* start recv_send */
+  //JK bfam_communicator_start(communicator);
+
+  //JK /* finish recv */
+  //JK bfam_communicator_finish(communicator);
+
+
+  //JK /* check the comm results */
+  //JK bfam_domain_init_field(&domain, BFAM_DOMAIN_OR, volume, "p1",
+  //JK     0, poly1_field_check, NULL);
+  //JK bfam_domain_init_field(&domain, BFAM_DOMAIN_OR, volume, "p2",
+  //JK     0, poly2_field_check, NULL);
+  //JK bfam_domain_init_field(&domain, BFAM_DOMAIN_OR, volume, "p3",
+  //JK     0, poly3_field_check, NULL);
+
+
+  //JK /* clean up */
+  //JK bfam_communicator_free(communicator);
+  //JK bfam_free(communicator);
+  //JK bfam_domain_free(&domain);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -769,7 +1078,12 @@ main (int argc, char *argv[])
   test_2d(rank,mpi_size,MPI_COMM_WORLD);
 
   /* test 3d */
-  // test_3d(rank,mpi_size,MPI_COMM_WORLD);
+  test_3d(rank,mpi_size,MPI_COMM_WORLD);
+
+  for(int face0 = 0; face0 < 8; face0++)
+    for(int face1 = face0; face1 < 8; face1++)
+      for(int rot = 0; rot < 4; rot++)
+        test_3d_2block(rank,mpi_size,MPI_COMM_WORLD,face0,face1,rot);
 
   /* stop MPI */
   BFAM_MPI_CHECK(MPI_Finalize());
