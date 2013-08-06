@@ -434,6 +434,9 @@ bfam_multiple_build("NORDER" "${bfam_dgx_quad_norders}"
   examples/elasticity_dgx_quad/bfam_exam_elasticity_dgx_quad_rhs.c
   bfam_exam_elasticity_dgx_quad)
 
+add_executable(bfam_exam_friction examples/friction/bfam_exam_friction.c)
+target_link_libraries(bfam_exam_friction bfam)
+
 ##
 ## Tests
 ##
