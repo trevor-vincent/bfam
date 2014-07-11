@@ -353,8 +353,41 @@ void blade_dgx_intra_rhs_advection(
           dq[off+n] += HALF*wi_ijk*JI[off+n]*uy[off+n]*aux0[n];
         }
 
-    /****** Z-DERIVATIVE ******/
 #if DIM==3
+    /****** Z-DERIVATIVE ******/
+    /* q -= JI*(Jrz*Dr*(uz*q) + Jsz*Ds*(uz*q) + Jtz*Dt*(uz*q)) */
+    for(bfam_locidx_t i = 0; i < Np; i++) aux0[i] = uz[off+i] * q[off+i];
+    BLADE_DR1(aux0, aux1); /* Dr */
+    BLADE_DR2(aux0, aux2); /* Ds */
+    BLADE_DR3(aux0, aux3); /* Dt */
+    for(bfam_locidx_t i = 0; i < Np; i++)
+          dq[off+i] -= HALF*JI[off+i]
+                        *(  Jr1x3[off+i]*aux1[i]
+                          + Jr2x3[off+i]*aux2[i]
+                          + Jr3x3[off+i]*aux3[i]);
+
+    /* q += MI*JI*uz*(Dr'*M*Jrz*q + Ds'*M*Jsz*q + Dt'*M*Jtz*q) */
+    n = 0;
+    for(bfam_locidx_t k = 0; k < N+1; k++)
+      for(bfam_locidx_t j = 0; j < N+1; j++)
+        for(bfam_locidx_t i = 0; i < N+1; i++,n++)
+        {
+          aux1[n] = w[i]*w[j]*w[k]*Jr1x3[off+n]*q[off+n];
+          aux2[n] = w[i]*w[j]*w[k]*Jr2x3[off+n]*q[off+n];
+          aux3[n] = w[i]*w[j] *w[k]*Jr3x3[off+n]*q[off+n];
+        }
+    BLADE_DR1T   (aux1, aux0);
+    BLADE_DR2T_PE(aux2, aux0);
+    BLADE_DR3T_PE(aux3, aux0);
+
+    n = 0;
+    for(bfam_locidx_t k = 0; k < N+1; k++)
+      for(bfam_locidx_t j = 0; j < N+1; j++)
+        for(bfam_locidx_t i = 0; i < N+1; i++,n++)
+        {
+          const bfam_real_t wi_ijk = wi[i]*wi[j]*wi[k];
+          dq[off+n] += HALF*wi_ijk*JI[off+n]*uz[off+n]*aux0[n];
+        }
 #endif
 
     /* loop over faces */
