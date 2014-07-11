@@ -1,7 +1,7 @@
 -- default parameters
-N1 = 2
-N2 = 2
-N3 = 2
+N1 = 4
+N2 = N1
+N3 = N1
 min_level = 1
 max_level = 1
 

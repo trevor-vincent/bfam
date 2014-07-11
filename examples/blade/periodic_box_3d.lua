@@ -1,15 +1,13 @@
 -- default parameters
-N1 = 2
-N2 = 2
-N3 = 2
+N1 = 4
+N2 = N1
+N3 = N1
 min_level = 1
 max_level = 1
 
 ux = 1
 uy = 2
 uz = 3
-
-q = 1
 
 -- store random seed
 math.randomseed(0)
@@ -21,9 +19,9 @@ output_prefix = "solution_3d"
 connectivity = "brick"
 brick =
 {
-  nx = 4,
+  nx = 2,
   ny = 3,
-  nz = 2,
+  nz = 4,
   periodic_x = 1,
   periodic_y = 1,
   periodic_z = 1,
@@ -48,13 +46,14 @@ function connectivity_vertices(x, y, z)
 end
 
 k1 = 2*math.pi
-k2 = 4*math.pi
-k3 = 6*math.pi
+k2 = 2*math.pi
+k3 = 2*math.pi
 function q(x, y, z, t)
-  r1 = x/Lx/brick.nx
-  r2 = y/Ly/brick.ny
-  r3 = z/Lz/brick.nz
-  val = math.sin(k1*r1)
+  r1 = (x-ux*t)/Lx/brick.nx
+  r2 = (y-uy*t)/Ly/brick.ny
+  r3 = (z-uz*t)/Lz/brick.nz
+  val = 0
+  val = val + math.sin(k1*r1)
   val = val + math.sin(k2*r2)
   val = val + math.sin(k3*r3)
   return val
@@ -92,7 +91,7 @@ end
 lsrk_method  = "KC54"
 
 tend  = 4*Lx
-tout  = tend/10
+tout  = tend/100
 tdisp = tend/10
 terr  = tend/10
 dt_fudge = 0.5
