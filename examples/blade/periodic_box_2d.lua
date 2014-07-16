@@ -1,9 +1,9 @@
 -- default parameters
-N1 = 4
-N2 = N1
-N3 = N1
-min_level = 1
-max_level = 1
+N1 = 1
+N2 = N1+1
+N3 = N2+1
+min_level = 3
+max_level = 5
 
 ux = 1
 uy = 1

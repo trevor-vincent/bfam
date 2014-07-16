@@ -142,6 +142,9 @@ BFAM_ASSUME_ALIGNED(field,32);
 
 #define HALF BFAM_REAL(0.5)
 
+#define MASSPROJECTION   (1)
+#define PROJECTION       (0)
+
 void blade_dgx_scale_rates_advection(
     int inN, bfam_subdomain_dgx_t *sub, const char *rate_prefix,
     const bfam_long_real_t a)
@@ -455,6 +458,78 @@ blade_dgx_remove_flux( const int inN,
   }
 }
 
+static inline void
+blade_project_flux(bfam_real_t *qs, const bfam_real_t *qg,
+               bfam_locidx_t  inN,     bfam_locidx_t  Nrpg,
+           const bfam_real_t * P1
+#if DIM==3
+          ,const bfam_real_t * P2
+#endif
+           )
+{
+  GENERIC_INIT(inN,blade_project_flux);
+
+  /* zero out the components */
+  for(int i = 0; i < Nfp; i++)
+  {
+    qs[i] = 0;
+  }
+
+  for(int m = 0, p = 0; m < Nrpg; m++)
+#if DIM==3
+    for(int l = 0; l < Nrpg; l++)
+#endif
+    {
+      for(int j = 0, n = 0; j < N+1; j++)
+#if DIM==3
+        for(int i = 0; i < N+1; i++)
+#endif
+        {
+          const bfam_real_t PR = BLADE_D3_AP(P1[j+m*(N+1)],
+                                            *P2[i+l*(N+1)]);
+          qs[n] += PR*qg[p];
+          n++;
+        }
+      p++;
+    }
+}
+
+static inline void
+blade_massproject_flux(bfam_real_t *qs, const bfam_real_t *qg,
+               bfam_locidx_t  inN,     bfam_locidx_t  Nrpg,
+           const bfam_real_t * MP1,
+#if DIM==3
+           const bfam_real_t * MP2,
+#endif
+           const bfam_real_t  *wi)
+{
+  GENERIC_INIT(inN,blade_massproject_flux);
+
+  /* zero out the components */
+  for(int i = 0; i < Nfp; i++)
+  {
+    qs[i] = 0;
+  }
+
+  for(int m = 0, p = 0; m < Nrpg; m++)
+#if DIM==3
+    for(int l = 0; l < Nrpg; l++)
+#endif
+    {
+      for(int j = 0, n = 0; j < N+1; j++)
+#if DIM==3
+        for(int i = 0; i < N+1; i++)
+#endif
+        {
+          const bfam_real_t wi_MP = BLADE_D3_AP(wi[j]*MP1[j+m*(N+1)],
+                                               *wi[i]*MP2[i+l*(N+1)]);
+          qs[n] += wi_MP*qg[p];
+          n++;
+        }
+      p++;
+    }
+}
+
 void blade_dgx_inter_rhs_interface(
     int inN, bfam_subdomain_dgx_t *sub_g, const char *rate_prefix,
     const char *field_prefix, const bfam_long_real_t t)
@@ -473,12 +548,14 @@ void blade_dgx_inter_rhs_interface(
   BFAM_ASSERT(glue_p != NULL);
   bfam_dictionary_t *fields_m    = &glue_m->base.fields;
   bfam_dictionary_t *fields_p    = &glue_p->base.fields;
+  bfam_dictionary_t *fields_g    = &sub_g->base.fields;
   bfam_dictionary_t *fields      = &sub_m->base.fields;
   bfam_dictionary_t *fields_face = &sub_m->base.fields_face;
 
   BFAM_LOAD_FIELD_RESTRICT_ALIGNED(q  ,field_prefix,"q" ,fields);
   BFAM_LOAD_FIELD_RESTRICT_ALIGNED(q_M,field_prefix,"q" ,fields_m);
   BFAM_LOAD_FIELD_RESTRICT_ALIGNED(q_P,field_prefix,"q" ,fields_p);
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(u_g,field_prefix,"u" ,fields_g);
 
   BFAM_LOAD_FIELD_RESTRICT_ALIGNED(dq ,rate_prefix ,"q" ,fields);
 
@@ -530,126 +607,73 @@ void blade_dgx_inter_rhs_interface(
 #define N  NORDER
 #endif
 
-    bfam_real_t q_g[Np_g];
+    bfam_real_t uqS_g[Np_g];
 
+    /* Compute the flux on the glue grid */
     for(bfam_locidx_t pnt = 0; pnt < Np_g; pnt++)
     {
       bfam_locidx_t iG = pnt+le*Np_g;
-
-      /* Setup stuff for the minus side */
-//JK      bfam_real_t ZsM = Zs_M[iG];
-//JK      bfam_real_t ZpM = Zp_M[iG];
-
-//JK      bfam_real_t TpM[] = {Tp1_M[iG], Tp2_M[iG], Tp3_M[iG]};
-//JK      bfam_real_t TnM = Tn_M[iG];
-
-//JK      bfam_real_t vpM[] = {vp1_M[iG],vp2_M[iG],vp3_M[iG]};
-//JK      bfam_real_t vnM = vn_M[iG];
-
-//JK      /* now add the real flux */
-//JK      /* Setup stuff for the plus side */
-//JK      bfam_real_t ZsP = Zs_P[iG];
-//JK      bfam_real_t ZpP = Zp_P[iG];
-
-//JK      bfam_real_t TpP[] = {Tp1_P[iG], Tp2_P[iG], Tp3_P[iG]};
-//JK      bfam_real_t TnP = Tn_P[iG];
-
-//JK      bfam_real_t vpP[] = {vp1_P[iG],vp2_P[iG],vp3_P[iG]};
-//JK      bfam_real_t vnP = vn_P[iG];
-
-//JK      BEARD_STATE(
-//JK          &TnS_g[pnt],&TpS_g[3*pnt],&vnS_g[pnt],&vpS_g[3*pnt],
-//JK          TnM, TnP, TpM, TpP, vnM, vnP, vpM, vpP, ZpM, ZpP, ZsM, ZsP);
-
-//JK      /* substract off the grid values */
-//JK      TpS_g[3*pnt+0] -= TpM[0];
-//JK      TpS_g[3*pnt+1] -= TpM[1];
-//JK      TpS_g[3*pnt+2] -= TpM[2];
-//JK      TnS_g[pnt]     -= TnM;
+      blade_dgx_compute_flux(u_g[iG], q_M[iG], q_P[iG], &uqS_g[pnt]);
     }
 
-//JK    bfam_real_t *restrict TpS_M;
-//JK    bfam_real_t *restrict TnS_M;
-//JK    bfam_real_t *restrict vpS_M;
-//JK    bfam_real_t *restrict vnS_M;
 
-//JK    /* these will be used to the store the projected values if we need them */
-//JK    BFAM_ALIGN(32) bfam_real_t TpS_m_STORAGE[3*Nfp];
-//JK    BFAM_ALIGN(32) bfam_real_t TnS_m_STORAGE[  Nfp];
-//JK    BFAM_ALIGN(32) bfam_real_t vpS_m_STORAGE[3*Nfp];
-//JK    BFAM_ALIGN(32) bfam_real_t vnS_m_STORAGE[  Nfp];
+    /* these will be used to the store the projected values if we need them */
+    BFAM_ALIGN(32) bfam_real_t uqS_M_STORAGE[Nfp];
 
-//JK    /* check to tee if projection */
-//JK    /* locked */
-//JK    {
-//JK      /* set to the correct Mass times projection */
-//JK      TpS_M = TpS_m_STORAGE;
-//JK      TnS_M = TnS_m_STORAGE;
-//JK      vpS_M = vpS_m_STORAGE;
-//JK      vnS_M = vnS_m_STORAGE;
+    /* For now set the pointer to the storage */
+    bfam_real_t *restrict uqS_M = uqS_M_STORAGE;
 
-//JK      if(MASSPROJECTION && (!glue_p->same_order || glue_p->EToHm[le] || glue_p->EToHp[le]))
-//JK      {
-//JK        BFAM_ASSERT(glue_m->massprojection);
-//JK#if   DIM == 2
-//JK        const bfam_real_t *MP1 = glue_m->massprojection[glue_p->EToHm[le]];
-//JK#elif DIM == 3
-//JK        const int I1 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)/2+1;
-//JK        const int I2 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)%2+1;
-//JK        const bfam_real_t *MP1 = glue_m->massprojection[I1];
-//JK        const bfam_real_t *MP2 = glue_m->massprojection[I2];
-//JK#else
-//JK#error "Bad Dimension"
-//JK#endif
-//JK        beard_massproject_flux(TnS_M, TpS_M, vnS_M, vpS_M, N, Nrp_g, TnS_g, TpS_g,
-//JK                               vnS_g, vpS_g,
-//JK                               MP1,
-//JK#if DIM==3
-//JK                               MP2,
-//JK#endif
-//JK                               wi);
-//JK      }
-//JK      else if(PROJECTION  && (!glue_p->same_order || glue_p->EToHm[le] || glue_p->EToHp[le]))
-//JK      {
-//JK        BFAM_ASSERT(glue_m->projection);
-//JK#if   DIM == 2
-//JK        const bfam_real_t *P1 = glue_m->projection[glue_p->EToHm[le]];
-//JK#elif DIM == 3
-//JK        const int I1 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)/2+1;
-//JK        const int I2 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)%2+1;
-//JK        const bfam_real_t *P1 = glue_m->projection[I1];
-//JK        const bfam_real_t *P2 = glue_m->projection[I2];
-//JK#else
-//JK#error "Bad Dimension"
-//JK#endif
-//JK        beard_project_flux(TnS_M, TpS_M, vnS_M, vpS_M, N, Nrp_g, TnS_g, TpS_g,
-//JK                           vnS_g, vpS_g,
-//JK                           P1
-//JK#if DIM==3
-//JK                          ,P2
-//JK#endif
-//JK                           );
-//JK      }
-//JK      else
-//JK      {
-//JK        TpS_M = TpS_g;
-//JK        TnS_M = TnS_g;
-//JK        vpS_M = vpS_g;
-//JK        vnS_M = vnS_g;
-//JK      }
-//JK    }
+    /* check to see if projection */
+    if(MASSPROJECTION && (!glue_p->same_order || glue_p->EToHm[le]
+                                              || glue_p->EToHp[le]))
+    {
+      BFAM_ASSERT(glue_m->massprojection);
+#if   DIM == 2
+      const bfam_real_t *MP1 = glue_m->massprojection[glue_p->EToHm[le]];
+#elif DIM == 3
+      const int I1 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)/2+1;
+      const int I2 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)%2+1;
+      const bfam_real_t *MP1 = glue_m->massprojection[I1];
+      const bfam_real_t *MP2 = glue_m->massprojection[I2];
+#else
+#error "Bad Dimension"
+#endif
+              blade_massproject_flux(uqS_M, uqS_g, N, Nrp_g,
+                  MP1,
+#if DIM==3
+                  MP2,
+#endif
+                                     wi);
+    }
+    else if(PROJECTION  && (!glue_p->same_order || glue_p->EToHm[le] || glue_p->EToHp[le]))
+    {
+      BFAM_ASSERT(glue_m->projection);
+#if   DIM == 2
+      const bfam_real_t *P1 = glue_m->projection[glue_p->EToHm[le]];
+#elif DIM == 3
+      const int I1 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)/2+1;
+      const int I2 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)%2+1;
+      const bfam_real_t *P1 = glue_m->projection[I1];
+      const bfam_real_t *P2 = glue_m->projection[I2];
+#else
+#error "Bad Dimension"
+#endif
+      blade_project_flux(uqS_M, uqS_g, N, Nrp_g,
+          P1
+#if DIM==3
+          ,P2
+#endif
+          );
+    }
+    else
+      uqS_M = uqS_g;
 
-//JK    for(bfam_locidx_t pnt = 0; pnt < Nfp; pnt++)
-//JK    {
-//JK      bfam_locidx_t f = pnt + Nfp*(face + Nfaces*e);
-//JK      bfam_locidx_t iM = sub_m->vmapM[f];
-//JK      const bfam_real_t nM[] = {n1[f],n2[f],BEARD_D3_AP(0,+n3[f])};
-
-//JK      beard_dgx_add_flux(1,
-//JK          TnS_M[pnt],&TpS_M[3*pnt],vnS_M[pnt],&vpS_M[3*pnt],iM,
-//JK          dv1,dv2,dv3, dS11,dS22,dS33,dS12,dS13,dS23,
-//JK          lam[iM],mu[iM],rhoi[iM],nM,sJ[f],JI[iM],wi[0]);
-//JK    }
+    for(bfam_locidx_t pnt = 0; pnt < Nfp; pnt++)
+    {
+      bfam_locidx_t f = pnt + Nfp*(face + Nfaces*e);
+      bfam_locidx_t iM = sub_m->vmapM[f];
+      blade_dgx_add_flux(1, dq, iM, uqS_M[pnt], sJ[f], JI[iM],wi[0]);
+    }
   }
 }
 
