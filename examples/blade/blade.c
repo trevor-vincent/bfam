@@ -1362,6 +1362,38 @@ void intra_rhs (bfam_subdomain_t *thisSubdomain, const char *rate_prefix,
     BFAM_ABORT("Unknown subdomain: %s",thisSubdomain->name);
 }
 
+void inter_rhs_interface(int N, bfam_subdomain_dgx_t *sub,
+    const char *rate_prefix, const char *field_prefix, const bfam_long_real_t t)
+{
+#if   DIM==2
+#define X(order) \
+  case order: blade_dgx_inter_rhs_interface_2_##order(N,sub, \
+                  rate_prefix,field_prefix,t); break;
+#elif DIM==3
+#define X(order) \
+  case order: blade_dgx_inter_rhs_interface_3_##order(N,sub, \
+                  rate_prefix,field_prefix,t); break;
+#else
+#error "bad dimension"
+#endif
+
+
+  switch(N)
+  {
+    BFAM_LIST_OF_DGX_NORDERS
+    default:
+#if   DIM==2
+      blade_dgx_inter_rhs_interface_2_(N,sub,rate_prefix, field_prefix,t);
+#elif DIM==3
+      blade_dgx_inter_rhs_interface_3_(N,sub,rate_prefix, field_prefix,t);
+#else
+#error "bad dimension"
+#endif
+      break;
+  }
+#undef X
+}
+
 void inter_rhs (bfam_subdomain_t *thisSubdomain, const char *rate_prefix,
     const char *minus_rate_prefix, const char *field_prefix,
     const bfam_long_real_t t)
@@ -1372,12 +1404,11 @@ void inter_rhs (bfam_subdomain_t *thisSubdomain, const char *rate_prefix,
   else if(bfam_subdomain_has_tag(thisSubdomain,"_glue_parallel")
       ||  bfam_subdomain_has_tag(thisSubdomain,"_glue_local"))
   {
-    BFAM_ABORT("inter_rhs: not implemented");
     BFAM_ASSERT(minus_rate_prefix);
-    //JK bfam_subdomain_dgx_t *sub =
-    //JK   (bfam_subdomain_dgx_t*) thisSubdomain;
-    //JK inter_rhs_interface(((bfam_subdomain_dgx_t*)sub->base.glue_m->sub_m)->N,
-    //JK     sub,minus_rate_prefix,field_prefix,t);
+    bfam_subdomain_dgx_t *sub =
+      (bfam_subdomain_dgx_t*) thisSubdomain;
+    inter_rhs_interface(((bfam_subdomain_dgx_t*)sub->base.glue_m->sub_m)->N,
+        sub,minus_rate_prefix,field_prefix,t);
   }
   else
     BFAM_ABORT("Unknown subdomain: %s",thisSubdomain->name);

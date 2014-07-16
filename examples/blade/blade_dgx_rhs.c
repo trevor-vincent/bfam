@@ -131,6 +131,9 @@ BFAM_ASSUME_ALIGNED(field,32);
 #define blade_dgx_intra_rhs_advection \
   BLADE_APPEND_EXPAND_4(blade_dgx_intra_rhs_advection_,DIM,_,NORDER)
 
+#define blade_dgx_inter_rhs_interface \
+  BLADE_APPEND_EXPAND_4(blade_dgx_inter_rhs_interface_,DIM,_,NORDER)
+
 #define blade_dgx_energy \
   BLADE_APPEND_EXPAND_4(blade_dgx_energy_,DIM,_,NORDER)
 
@@ -410,6 +413,232 @@ void blade_dgx_intra_rhs_advection(
         blade_dgx_add_flux(1, dq, iM, u, q[iM], q[iP],sJ[f],JI[iM],wi[0]);
       }
     }
+  }
+}
+
+static inline void
+blade_dgx_remove_flux( const int inN,
+    bfam_locidx_t face, bfam_locidx_t e, const bfam_locidx_t *vmapM,
+    const bfam_real_t *n1, const bfam_real_t *n2,
+#if DIM==3
+    const bfam_real_t *n3,
+#endif
+    const bfam_real_t *ux, const bfam_real_t *uy,
+#if DIM==3
+    const bfam_real_t *uz,
+#endif
+    const bfam_real_t *sJ, const bfam_real_t *JI,   const bfam_real_t *wi,
+    const bfam_real_t * q,
+          bfam_real_t *dq)
+{
+  GENERIC_INIT(inN,blade_dgx_remove_flux);
+
+  for(bfam_locidx_t pnt = 0; pnt < Nfp; pnt++)
+  {
+    bfam_locidx_t f = pnt + Nfp*(face + Nfaces*e);
+    bfam_locidx_t iM = vmapM[f];
+    const bfam_real_t u = BLADE_D3_AP( ux[iM] * n1[f]
+                                     + uy[iM] * n2[f],
+                                     + uz[iM] * n3[f]);
+    blade_dgx_add_flux(-1, dq, iM, u, q[iM], q[iM],sJ[f],JI[iM],wi[0]);
+  }
+}
+
+void blade_dgx_inter_rhs_interface(
+    int inN, bfam_subdomain_dgx_t *sub_g, const char *rate_prefix,
+    const char *field_prefix, const bfam_long_real_t t)
+{
+  GENERIC_INIT(inN,blade_dgx_inter_rhs_interface);
+
+  bfam_subdomain_dgx_t* sub_m =
+    (bfam_subdomain_dgx_t*) sub_g->base.glue_m->sub_m;
+
+  /* get the fields we will need */
+  bfam_subdomain_dgx_glue_data_t* glue_m =
+    (bfam_subdomain_dgx_glue_data_t*) sub_g->base.glue_m;
+  bfam_subdomain_dgx_glue_data_t* glue_p =
+    (bfam_subdomain_dgx_glue_data_t*) sub_g->base.glue_p;
+  BFAM_ASSERT(glue_m != NULL);
+  BFAM_ASSERT(glue_p != NULL);
+  bfam_dictionary_t *fields_m    = &glue_m->base.fields;
+  bfam_dictionary_t *fields_p    = &glue_p->base.fields;
+  bfam_dictionary_t *fields      = &sub_m->base.fields;
+  bfam_dictionary_t *fields_face = &sub_m->base.fields_face;
+
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(q  ,field_prefix,"q" ,fields);
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(q_M,field_prefix,"q" ,fields_m);
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(q_P,field_prefix,"q" ,fields_p);
+
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(dq ,rate_prefix ,"q" ,fields);
+
+  /* get the material properties and metric terms */
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(ux ,field_prefix,"ux" ,fields);
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(uy ,field_prefix,"uy" ,fields);
+  BLADE_D3_OP(BFAM_LOAD_FIELD_RESTRICT_ALIGNED(uz,field_prefix,"uz",fields));
+//JK  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(J   ,"","_grid_J"  ,fields);
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(JI  ,"","_grid_JI" ,fields);
+
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(n1,"","_grid_nx0",fields_face);
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(n2,"","_grid_nx1",fields_face);
+  BLADE_D3_OP(BFAM_LOAD_FIELD_RESTRICT_ALIGNED(n3,"","_grid_nx2",fields_face));
+  BFAM_LOAD_FIELD_RESTRICT_ALIGNED(sJ  ,"","_grid_sJ",fields_face);
+
+  bfam_real_t *wi  = sub_m->wi;
+  BFAM_ASSUME_ALIGNED(wi ,32);
+
+  BFAM_ASSERT(glue_p->EToEm);
+  BFAM_ASSERT(glue_p->EToFm);
+  BFAM_ASSERT(glue_p->EToHm);
+
+  for(bfam_locidx_t le = 0; le < sub_g->K; le++)
+  {
+    bfam_locidx_t e = glue_p->EToEm[le];
+    int8_t face = glue_p->EToFm[le];
+
+    if(glue_p->EToHm[le] < 2)
+      blade_dgx_remove_flux(N,face,e,sub_m->vmapM,
+          n1,n2,
+#if DIM==3
+          n3,
+#endif
+          ux,uy,
+#if DIM==3
+          uz,
+#endif
+          sJ,JI,wi,
+          q,dq);
+
+#ifndef USE_GENERIC
+#undef Np
+#undef N
+#endif
+    bfam_locidx_t Np_g  = sub_g->Np;
+    bfam_locidx_t Nrp_g = sub_g->N+1;
+#ifndef USE_GENERIC
+#define Np Np_BACK
+#define N  NORDER
+#endif
+
+    bfam_real_t q_g[Np_g];
+
+    for(bfam_locidx_t pnt = 0; pnt < Np_g; pnt++)
+    {
+      bfam_locidx_t iG = pnt+le*Np_g;
+
+      /* Setup stuff for the minus side */
+//JK      bfam_real_t ZsM = Zs_M[iG];
+//JK      bfam_real_t ZpM = Zp_M[iG];
+
+//JK      bfam_real_t TpM[] = {Tp1_M[iG], Tp2_M[iG], Tp3_M[iG]};
+//JK      bfam_real_t TnM = Tn_M[iG];
+
+//JK      bfam_real_t vpM[] = {vp1_M[iG],vp2_M[iG],vp3_M[iG]};
+//JK      bfam_real_t vnM = vn_M[iG];
+
+//JK      /* now add the real flux */
+//JK      /* Setup stuff for the plus side */
+//JK      bfam_real_t ZsP = Zs_P[iG];
+//JK      bfam_real_t ZpP = Zp_P[iG];
+
+//JK      bfam_real_t TpP[] = {Tp1_P[iG], Tp2_P[iG], Tp3_P[iG]};
+//JK      bfam_real_t TnP = Tn_P[iG];
+
+//JK      bfam_real_t vpP[] = {vp1_P[iG],vp2_P[iG],vp3_P[iG]};
+//JK      bfam_real_t vnP = vn_P[iG];
+
+//JK      BEARD_STATE(
+//JK          &TnS_g[pnt],&TpS_g[3*pnt],&vnS_g[pnt],&vpS_g[3*pnt],
+//JK          TnM, TnP, TpM, TpP, vnM, vnP, vpM, vpP, ZpM, ZpP, ZsM, ZsP);
+
+//JK      /* substract off the grid values */
+//JK      TpS_g[3*pnt+0] -= TpM[0];
+//JK      TpS_g[3*pnt+1] -= TpM[1];
+//JK      TpS_g[3*pnt+2] -= TpM[2];
+//JK      TnS_g[pnt]     -= TnM;
+    }
+
+//JK    bfam_real_t *restrict TpS_M;
+//JK    bfam_real_t *restrict TnS_M;
+//JK    bfam_real_t *restrict vpS_M;
+//JK    bfam_real_t *restrict vnS_M;
+
+//JK    /* these will be used to the store the projected values if we need them */
+//JK    BFAM_ALIGN(32) bfam_real_t TpS_m_STORAGE[3*Nfp];
+//JK    BFAM_ALIGN(32) bfam_real_t TnS_m_STORAGE[  Nfp];
+//JK    BFAM_ALIGN(32) bfam_real_t vpS_m_STORAGE[3*Nfp];
+//JK    BFAM_ALIGN(32) bfam_real_t vnS_m_STORAGE[  Nfp];
+
+//JK    /* check to tee if projection */
+//JK    /* locked */
+//JK    {
+//JK      /* set to the correct Mass times projection */
+//JK      TpS_M = TpS_m_STORAGE;
+//JK      TnS_M = TnS_m_STORAGE;
+//JK      vpS_M = vpS_m_STORAGE;
+//JK      vnS_M = vnS_m_STORAGE;
+
+//JK      if(MASSPROJECTION && (!glue_p->same_order || glue_p->EToHm[le] || glue_p->EToHp[le]))
+//JK      {
+//JK        BFAM_ASSERT(glue_m->massprojection);
+//JK#if   DIM == 2
+//JK        const bfam_real_t *MP1 = glue_m->massprojection[glue_p->EToHm[le]];
+//JK#elif DIM == 3
+//JK        const int I1 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)/2+1;
+//JK        const int I2 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)%2+1;
+//JK        const bfam_real_t *MP1 = glue_m->massprojection[I1];
+//JK        const bfam_real_t *MP2 = glue_m->massprojection[I2];
+//JK#else
+//JK#error "Bad Dimension"
+//JK#endif
+//JK        beard_massproject_flux(TnS_M, TpS_M, vnS_M, vpS_M, N, Nrp_g, TnS_g, TpS_g,
+//JK                               vnS_g, vpS_g,
+//JK                               MP1,
+//JK#if DIM==3
+//JK                               MP2,
+//JK#endif
+//JK                               wi);
+//JK      }
+//JK      else if(PROJECTION  && (!glue_p->same_order || glue_p->EToHm[le] || glue_p->EToHp[le]))
+//JK      {
+//JK        BFAM_ASSERT(glue_m->projection);
+//JK#if   DIM == 2
+//JK        const bfam_real_t *P1 = glue_m->projection[glue_p->EToHm[le]];
+//JK#elif DIM == 3
+//JK        const int I1 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)/2+1;
+//JK        const int I2 = (glue_p->EToHm[le] == 0) ? 0 : (glue_p->EToHm[le]-1)%2+1;
+//JK        const bfam_real_t *P1 = glue_m->projection[I1];
+//JK        const bfam_real_t *P2 = glue_m->projection[I2];
+//JK#else
+//JK#error "Bad Dimension"
+//JK#endif
+//JK        beard_project_flux(TnS_M, TpS_M, vnS_M, vpS_M, N, Nrp_g, TnS_g, TpS_g,
+//JK                           vnS_g, vpS_g,
+//JK                           P1
+//JK#if DIM==3
+//JK                          ,P2
+//JK#endif
+//JK                           );
+//JK      }
+//JK      else
+//JK      {
+//JK        TpS_M = TpS_g;
+//JK        TnS_M = TnS_g;
+//JK        vpS_M = vpS_g;
+//JK        vnS_M = vnS_g;
+//JK      }
+//JK    }
+
+//JK    for(bfam_locidx_t pnt = 0; pnt < Nfp; pnt++)
+//JK    {
+//JK      bfam_locidx_t f = pnt + Nfp*(face + Nfaces*e);
+//JK      bfam_locidx_t iM = sub_m->vmapM[f];
+//JK      const bfam_real_t nM[] = {n1[f],n2[f],BEARD_D3_AP(0,+n3[f])};
+
+//JK      beard_dgx_add_flux(1,
+//JK          TnS_M[pnt],&TpS_M[3*pnt],vnS_M[pnt],&vpS_M[3*pnt],iM,
+//JK          dv1,dv2,dv3, dS11,dS22,dS33,dS12,dS13,dS23,
+//JK          lam[iM],mu[iM],rhoi[iM],nM,sJ[f],JI[iM],wi[0]);
+//JK    }
   }
 }
 
