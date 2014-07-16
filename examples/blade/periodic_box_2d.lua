@@ -1,9 +1,9 @@
 -- default parameters
-N1 = 1
+N1 = 3
 N2 = N1+1
 N3 = N2+1
-min_level = 3
-max_level = 5
+min_level = 1
+max_level = 3
 
 ux = 1
 uy = 1
@@ -65,7 +65,7 @@ function refinement_function(
   elseif level >= max_level or x0+x1-y0-y1 < 0 then
     return 0
   end
-  return 0
+  return 1
 end
 
 function element_order(
