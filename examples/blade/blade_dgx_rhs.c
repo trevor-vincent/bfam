@@ -203,14 +203,21 @@ void blade_dgx_energy(
 
 #define GAM (BFAM_REAL(0))
 static inline void
-blade_dgx_add_flux(const bfam_real_t scale,
-          bfam_real_t *dq, const bfam_locidx_t iM,
+blade_dgx_compute_flux(
     const bfam_real_t   u, const bfam_real_t   qM, const bfam_real_t qP,
-    const bfam_real_t  sJ, const bfam_real_t   JI, const bfam_real_t wi)
+          bfam_real_t  *uqS)
 {
   /* compute the state u*q */
-  const bfam_real_t uqS = HALF*u*(qM+qP);
-  dq[iM] += scale*wi*JI*sJ*(HALF*u*qM-uqS);
+  *uqS  = HALF*u*qM; /* half due to the skew-symmetric splitting */
+  *uqS -= HALF*u*(qM+qP);
+}
+
+static inline void
+blade_dgx_add_flux(const bfam_real_t scale,
+          bfam_real_t *dq, const bfam_locidx_t iM, const bfam_real_t uqS,
+    const bfam_real_t  sJ, const bfam_real_t   JI, const bfam_real_t wi)
+{
+  dq[iM] += scale*wi*JI*sJ*uqS;
 }
 
 void blade_dgx_intra_rhs_advection(
@@ -410,7 +417,9 @@ void blade_dgx_intra_rhs_advection(
                                               + (uz[iM] + uz[iP]) * n3[f]);
 
         /* intra */
-        blade_dgx_add_flux(1, dq, iM, u, q[iM], q[iP],sJ[f],JI[iM],wi[0]);
+        bfam_real_t uqS;
+        blade_dgx_compute_flux(u,q[iM],q[iP],&uqS);
+        blade_dgx_add_flux(1, dq, iM, uqS, sJ[f], JI[iM],wi[0]);
       }
     }
   }
@@ -440,7 +449,9 @@ blade_dgx_remove_flux( const int inN,
     const bfam_real_t u = BLADE_D3_AP( ux[iM] * n1[f]
                                      + uy[iM] * n2[f],
                                      + uz[iM] * n3[f]);
-    blade_dgx_add_flux(-1, dq, iM, u, q[iM], q[iM],sJ[f],JI[iM],wi[0]);
+    bfam_real_t uqS;
+    blade_dgx_compute_flux(u,q[iM],q[iM],&uqS);
+    blade_dgx_add_flux(-1, dq, iM, uqS, sJ[f], JI[iM],wi[0]);
   }
 }
 
