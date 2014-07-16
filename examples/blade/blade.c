@@ -777,6 +777,65 @@ field_set_val(bfam_locidx_t npoints, const char *name, bfam_real_t t,
 }
 
 static void
+blade_grid_glue(bfam_locidx_t npoints, const char *name, bfam_real_t time,
+    bfam_real_t *restrict x, bfam_real_t *restrict y, bfam_real_t *restrict z,
+    struct bfam_subdomain *s, void *arg, bfam_real_t *restrict u)
+{
+  bfam_subdomain_dgx_t* sub_g = (bfam_subdomain_dgx_t*) s;
+
+  /* get the fields we will need */
+  bfam_dictionary_t *fields_m    = &sub_g->base.glue_m->fields;
+  bfam_dictionary_t *fields_p    = &sub_g->base.glue_p->fields;
+
+  bfam_real_t *ux_m = bfam_dictionary_get_value_ptr(fields_m, "ux");
+  bfam_real_t *ux_p = bfam_dictionary_get_value_ptr(fields_p, "ux");
+
+  bfam_real_t *nx_m = bfam_dictionary_get_value_ptr(fields_m, "_grid_nx0");
+  bfam_real_t *nx_p = bfam_dictionary_get_value_ptr(fields_p, "_grid_nx0");
+
+  bfam_real_t *uy_m = bfam_dictionary_get_value_ptr(fields_m, "uy");
+  bfam_real_t *uy_p = bfam_dictionary_get_value_ptr(fields_p, "uy");
+
+  bfam_real_t *ny_m = bfam_dictionary_get_value_ptr(fields_m, "_grid_nx1");
+  bfam_real_t *ny_p = bfam_dictionary_get_value_ptr(fields_p, "_grid_nx1");
+
+#if DIM==3
+  bfam_real_t *uz_m = bfam_dictionary_get_value_ptr(fields_m, "uz");
+  bfam_real_t *uz_p = bfam_dictionary_get_value_ptr(fields_p, "uz");
+
+  bfam_real_t *nz_m = bfam_dictionary_get_value_ptr(fields_m, "_grid_nx2");
+  bfam_real_t *nz_p = bfam_dictionary_get_value_ptr(fields_p, "_grid_nx2");
+#endif
+
+  BFAM_ASSERT(ux_m  != NULL);
+  BFAM_ASSERT(ux_p  != NULL);
+  BFAM_ASSERT(nx_m  != NULL);
+  BFAM_ASSERT(nx_p  != NULL);
+  BFAM_ASSERT(uy_m  != NULL);
+  BFAM_ASSERT(uy_p  != NULL);
+  BFAM_ASSERT(ny_m  != NULL);
+  BFAM_ASSERT(ny_p  != NULL);
+
+#if DIM==3
+  BFAM_ASSERT(uz_m  != NULL);
+  BFAM_ASSERT(uz_p  != NULL);
+  BFAM_ASSERT(nz_m  != NULL);
+  BFAM_ASSERT(nz_p  != NULL);
+#endif
+
+  /* Store the average of the normal velocity */
+  for(int n = 0;n < npoints;n++)
+    u[n] = 0.5*(
+        (nx_m[n]*ux_m[n]-nx_p[n]*ux_p[n])
+       +(ny_m[n]*uy_m[n]-ny_p[n]*uy_p[n])
+#if DIM==3
+       +(nz_m[n]*uz_m[n]-nz_p[n]*uz_p[n])
+#endif
+       );
+}
+
+
+static void
 domain_add_fields(blade_t *blade, prefs_t *prefs)
 {
   const char *volume[] = {"_volume",NULL};
@@ -805,73 +864,69 @@ domain_add_fields(blade_t *blade, prefs_t *prefs)
         comm_args_scalars[f]);
   }
 
-//JK   /* exchange material properties to glue */
-//JK   const char *glue_mat[] = {"u","_grid_x0","_grid_x1",
-//JK #if DIM==3
-//JK     "_grid_x2",
-//JK #endif
-//JK     NULL};
-//JK   for(bfam_locidx_t g = 0; glue_mat[g] != NULL; g++)
-//JK   {
-//JK     bfam_domain_add_minus_field(domain, BFAM_DOMAIN_OR, glue, glue_mat[g]);
-//JK     bfam_domain_add_plus_field( domain, BFAM_DOMAIN_OR, glue, glue_mat[g]);
-//JK   }
-//JK   bfam_domain_add_field(domain, BFAM_DOMAIN_OR, glue, "_grid_x0");
-//JK   bfam_domain_add_field(domain, BFAM_DOMAIN_OR, glue, "_grid_x1");
-//JK #if DIM==3
-//JK   bfam_domain_add_field(domain, BFAM_DOMAIN_OR, glue, "_grid_x2");
-//JK #endif
-//JK 
-//JK   const char *glue_face_scalar[] = {"_grid_nx0","_grid_nx1",
-//JK #if DIM==3
-//JK     "_grid_nx2",
-//JK #endif
-//JK     NULL};
-//JK   for(bfam_locidx_t g = 0; glue_face_scalar[g] != NULL; g++)
-//JK   {
-//JK     bfam_domain_add_minus_field(domain, BFAM_DOMAIN_OR, glue,
-//JK         glue_face_scalar[g]);
-//JK     bfam_domain_add_plus_field( domain, BFAM_DOMAIN_OR, glue,
-//JK         glue_face_scalar[g]);
-//JK   }
-//JK 
-//JK   bfam_communicator_t material_comm;
-//JK 
-//JK   bfam_subdomain_comm_args_t mat_args;
-//JK   const char * mat_NULL[]      = {NULL};
-//JK   mat_args.scalars_m           = glue_mat;
-//JK   mat_args.vectors_m           = mat_NULL;
-//JK   mat_args.vector_components_m = mat_NULL;
-//JK   mat_args.tensors_m           = mat_NULL;
-//JK   mat_args.tensor_components_m = mat_NULL;
-//JK   mat_args.face_scalars_m      = glue_face_scalar;
-//JK 
-//JK   mat_args.scalars_p           = glue_mat;
-//JK   mat_args.vectors_p           = mat_NULL;
-//JK   mat_args.vector_components_p = mat_NULL;
-//JK   mat_args.tensors_p           = mat_NULL;
-//JK   mat_args.tensor_components_p = mat_NULL;
-//JK   mat_args.face_scalars_p      = glue_face_scalar;
-//JK 
-//JK   mat_args.user_comm_info       = NULL;
-//JK   mat_args.user_put_send_buffer = NULL;
-//JK   mat_args.user_get_recv_buffer = NULL;
-//JK   mat_args.user_data            = NULL;
-//JK 
-//JK   mat_args.user_prefix_function = NULL;
-//JK 
-//JK 
-//JK   bfam_communicator_init(&material_comm,domain,BFAM_DOMAIN_OR,glue,
-//JK       blade->mpicomm,10,&mat_args);
-//JK   bfam_communicator_start( &material_comm);
-//JK   bfam_communicator_finish(&material_comm);
-//JK   bfam_communicator_free(  &material_comm);
-//JK 
-//JK 
-//JK   /* we can trick init fields into handling locations to glue */
-//JK   bfam_domain_init_field(domain, BFAM_DOMAIN_OR, glue, "_grid_x0", 0,
-//JK       blade_grid_glue, NULL);
-//JK 
+   /* exchange material properties to glue */
+   const char *glue_mat[] = {"ux","uy",
+ #if DIM==3
+     "uz",
+ #endif
+     NULL};
+  for(bfam_locidx_t g = 0; glue_mat[g] != NULL; g++)
+  {
+    bfam_domain_add_minus_field(domain, BFAM_DOMAIN_OR, glue, glue_mat[g]);
+    bfam_domain_add_plus_field( domain, BFAM_DOMAIN_OR, glue, glue_mat[g]);
+  }
+  bfam_domain_add_field(domain, BFAM_DOMAIN_OR, glue, "u");
+
+  const char *glue_face_scalar[] = {"_grid_nx0","_grid_nx1",
+#if DIM==3
+    "_grid_nx2",
+#endif
+    NULL};
+  for(bfam_locidx_t g = 0; glue_face_scalar[g] != NULL; g++)
+  {
+    bfam_domain_add_minus_field(domain, BFAM_DOMAIN_OR, glue,
+        glue_face_scalar[g]);
+    bfam_domain_add_plus_field( domain, BFAM_DOMAIN_OR, glue,
+        glue_face_scalar[g]);
+  }
+
+  bfam_communicator_t material_comm;
+
+  bfam_subdomain_comm_args_t mat_args;
+  const char * mat_NULL[]      = {NULL};
+  mat_args.scalars_m           = glue_mat;
+  mat_args.vectors_m           = mat_NULL;
+  mat_args.vector_components_m = mat_NULL;
+  mat_args.tensors_m           = mat_NULL;
+  mat_args.tensor_components_m = mat_NULL;
+  mat_args.face_scalars_m      = glue_face_scalar;
+
+  mat_args.scalars_p           = glue_mat;
+  mat_args.vectors_p           = mat_NULL;
+  mat_args.vector_components_p = mat_NULL;
+  mat_args.tensors_p           = mat_NULL;
+  mat_args.tensor_components_p = mat_NULL;
+  mat_args.face_scalars_p      = glue_face_scalar;
+
+  mat_args.user_comm_info       = NULL;
+  mat_args.user_put_send_buffer = NULL;
+  mat_args.user_get_recv_buffer = NULL;
+  mat_args.user_data            = NULL;
+
+  mat_args.user_prefix_function = NULL;
+
+
+  bfam_communicator_init(&material_comm,domain,BFAM_DOMAIN_OR,glue,
+      blade->mpicomm,10,&mat_args);
+  bfam_communicator_start( &material_comm);
+  bfam_communicator_finish(&material_comm);
+  bfam_communicator_free(  &material_comm);
+
+
+  /* Compute the normal velocity to be used on the glue */
+  bfam_domain_init_field(domain, BFAM_DOMAIN_OR, glue, "u", 0,
+      blade_grid_glue, NULL);
+
 //JK   const char *boundary[] = {"_glue_boundary",NULL};
 //JK   const char *boundary_fields[] = {"_grid_x0","_grid_x1",
 //JK #if DIM==3
