@@ -1,8 +1,8 @@
 -- default parameters
 N1 = 3
-N2 = N1+1
-N3 = N2+1
-min_level = 1
+N2 = N1+0
+N3 = N2+0
+min_level = 3
 max_level = 3
 
 ux = 1
@@ -34,8 +34,8 @@ Lz = 25
 function connectivity_vertices(x, y, z)
   if x > 0 and x < brick.nx and
      y > 0 and y < brick.ny then
-     x = x + 0.5*(math.random()-0.5)
-     y = y + 0.5*(math.random()-0.5)
+     x = x + 0*0.5*(math.random()-0.5)
+     y = y + 0*0.5*(math.random()-0.5)
   end
   xout = Lx*x
   yout = Ly*y

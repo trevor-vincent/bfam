@@ -1,13 +1,13 @@
 -- default parameters
-N1 = 4
-N2 = N1
-N3 = N1
-min_level = 1
-max_level = 1
+N1 = 3
+N2 = N1+0
+N3 = N2+0
+min_level = 3
+max_level = 3
 
 ux = 1
-uy = 2
-uz = 3
+uy = 1
+uz = 0
 
 -- store random seed
 math.randomseed(0)
@@ -19,9 +19,9 @@ output_prefix = "solution_3d"
 connectivity = "brick"
 brick =
 {
-  nx = 2,
-  ny = 3,
-  nz = 4,
+  nx = 4,
+  ny = 4,
+  nz = 1,
   periodic_x = 1,
   periodic_y = 1,
   periodic_z = 1,
@@ -35,9 +35,9 @@ function connectivity_vertices(x, y, z)
   if x > 0 and x < brick.nx and
      y > 0 and y < brick.ny and
      z > 0 and z < brick.nz then
-    x = x + 0.5*(math.random()-0.5)
-    y = y + 0.5*(math.random()-0.5)
-    z = z + 0.5*(math.random()-0.5)
+    x = x + 0*0.5*(math.random()-0.5)
+    y = y + 0*0.5*(math.random()-0.5)
+    z = z + 0*0.5*(math.random()-0.5)
   end
   xout = Lx*x
   yout = Ly*y
@@ -71,7 +71,7 @@ function refinement_function(
   elseif level >= max_level or x0+x1-y0-y1 < 0 then
     return 0
   end
-  return 0
+  return 1
 end
 
 function element_order(
