@@ -645,7 +645,8 @@ void blade_dgx_inter_rhs_interface(
 #endif
                                      wi);
     }
-    else if(PROJECTION  && (!glue_p->same_order || glue_p->EToHm[le] || glue_p->EToHp[le]))
+    else if(PROJECTION  && (!glue_p->same_order || glue_p->EToHm[le]
+                                                || glue_p->EToHp[le]))
     {
       BFAM_ASSERT(glue_m->projection);
 #if   DIM == 2
