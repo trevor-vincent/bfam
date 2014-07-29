@@ -14,6 +14,7 @@ math.randomseed(0)
 
 -- refinement parameters
 output_prefix = "solution_3d"
+data_directory = "data"
 
 -- connectivity info
 connectivity = "brick"

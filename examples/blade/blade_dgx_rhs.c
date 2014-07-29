@@ -140,6 +140,9 @@ BFAM_ASSUME_ALIGNED(field,32);
 #define blade_dgx_add_rates_advection \
   BLADE_APPEND_EXPAND_4(blade_dgx_add_rates_advection_,DIM,_,NORDER)
 
+#define blade_dgx_add_rates_glue_p \
+  BLADE_APPEND_EXPAND_4(blade_dgx_add_rates_glue_p_,DIM,_,NORDER)
+
 #define HALF BFAM_REAL(0.5)
 
 #define MASSPROJECTION   (1)
@@ -698,6 +701,57 @@ void blade_dgx_add_rates_advection(
     BFAM_LOAD_FIELD_ALIGNED(         rhs ,field_prefix_rhs,f_names[f],fields);
     BFAM_LOAD_FIELD_RESTRICT_ALIGNED(rate,rate_prefix     ,f_names[f],fields);
     for(bfam_locidx_t n = 0; n < num_pts; n++) lhs[n] = rhs[n] + a*rate[n];
+  }
+}
+
+void blade_dgx_add_rates_glue_p(
+    int inN, bfam_subdomain_dgx_t *sub, const char *field_prefix_lhs,
+    const char *field_prefix_rhs, const char *rate_prefix,
+    const bfam_long_real_t a,
+    const char** scalars, const char** vectors, const char** tensors)
+{
+  GENERIC_INIT(inN,blade_dgx_glue_p);
+
+  const bfam_locidx_t num_pts = sub->K * Nfp;
+
+  /* get the fields we will need */
+  BFAM_ASSERT(sub->base.glue_p);
+  bfam_dictionary_t *fields = &sub->base.glue_p->fields;
+
+  for(int s = 0; scalars[s] != NULL;s++)
+  {
+    BFAM_LOAD_FIELD_ALIGNED(         lhs ,field_prefix_lhs,scalars[s],fields);
+    BFAM_LOAD_FIELD_ALIGNED(         rhs ,field_prefix_rhs,scalars[s],fields);
+    BFAM_LOAD_FIELD_RESTRICT_ALIGNED(rate,rate_prefix     ,scalars[s],fields);
+    for(bfam_locidx_t n = 0; n < num_pts; n++) lhs[n] = rhs[n] + a*rate[n];
+  }
+
+  const char* postfix[] = {"n","p1","p2","p3",NULL};
+  for(int s = 0; vectors[s] != NULL;s++)
+  {
+    char name[BFAM_BUFSIZ];
+    for(int k = 0; postfix[k] != NULL;k++)
+    {
+      snprintf(name,BFAM_BUFSIZ,"%s%s",vectors[s],postfix[k]);
+      BFAM_LOAD_FIELD_ALIGNED(         lhs ,field_prefix_lhs,name,fields);
+      BFAM_LOAD_FIELD_ALIGNED(         rhs ,field_prefix_rhs,name,fields);
+      BFAM_LOAD_FIELD_RESTRICT_ALIGNED(rate,rate_prefix     ,name,fields);
+      for(bfam_locidx_t n = 0; n < num_pts; n++) lhs[n] = rhs[n] + a*rate[n];
+      // for(bfam_locidx_t n = 0; n < num_pts; n++) BFAM_INFO("%d %f",n,lhs[n]);
+    }
+  }
+
+  for(int s = 0; tensors[s] != NULL;s++)
+  {
+    char name[BFAM_BUFSIZ];
+    for(int k = 0; postfix[k] != NULL;k++)
+    {
+      snprintf(name,BFAM_BUFSIZ,"%s%s",tensors[s],postfix[k]);
+      BFAM_LOAD_FIELD_ALIGNED(         lhs ,field_prefix_lhs,name,fields);
+      BFAM_LOAD_FIELD_ALIGNED(         rhs ,field_prefix_rhs,name,fields);
+      BFAM_LOAD_FIELD_RESTRICT_ALIGNED(rate,rate_prefix     ,name,fields);
+      for(bfam_locidx_t n = 0; n < num_pts; n++) lhs[n] = rhs[n] + a*rate[n];
+    }
   }
 }
 

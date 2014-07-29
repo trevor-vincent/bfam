@@ -1574,18 +1574,58 @@ void glue_rates (bfam_subdomain_t *thisSubdomain, const char *prefix)
   }
 }
 
+void add_rates_advection_glue_p (bfam_subdomain_dgx_t *sub,
+    const char *field_prefix_lhs, const char *field_prefix_rhs,
+    const char *rate_prefix, const bfam_long_real_t a)
+{
+#if   DIM==2
+#define X(order) \
+  case order: blade_dgx_add_rates_glue_p_2_##order(sub->N,sub, \
+                  field_prefix_lhs,field_prefix_rhs,rate_prefix,a,\
+                  comm_args_scalars, comm_args_vectors, comm_args_tensors);\
+  break;
+#elif DIM==3
+#define X(order) \
+  case order: blade_dgx_add_rates_glue_p_3_##order(sub->N,sub, \
+                  field_prefix_lhs,field_prefix_rhs,rate_prefix,a,\
+                  comm_args_scalars, comm_args_vectors, comm_args_tensors);\
+  break;
+#else
+#error "bad dimension"
+#endif
+
+  switch(sub->N)
+  {
+    BFAM_LIST_OF_DGX_NORDERS
+    default:
+#if   DIM==2
+      blade_dgx_add_rates_glue_p_2_(sub->N,sub,field_prefix_lhs,
+          field_prefix_rhs,rate_prefix,a, comm_args_scalars, comm_args_vectors,
+          comm_args_tensors);
+#elif DIM==3
+      blade_dgx_add_rates_glue_p_3_(sub->N,sub,field_prefix_lhs,
+          field_prefix_rhs,rate_prefix,a, comm_args_scalars, comm_args_vectors,
+          comm_args_tensors);
+#else
+#error "bad dimension"
+#endif
+      break;
+  }
+#undef X
+}
+
+
 void add_rates_glue_p (bfam_subdomain_t *thisSubdomain,
     const char *field_prefix_lhs, const char *field_prefix_rhs,
     const char *rate_prefix, const bfam_long_real_t a)
 {
-  BFAM_ABORT("add_rates_glue_p: not implemented");
   BFAM_ASSERT(bfam_subdomain_has_tag(thisSubdomain,"_subdomain_dgx"));
   if(bfam_subdomain_has_tag(thisSubdomain,"_glue_parallel")
       ||  bfam_subdomain_has_tag(thisSubdomain,"_glue_local"   ))
   {
-    //JK bfam_subdomain_dgx_t *sub = (bfam_subdomain_dgx_t*)thisSubdomain;
-    //JK add_rates_advection_glue_p(sub,field_prefix_lhs,field_prefix_rhs,
-    //JK                          rate_prefix,a);
+    bfam_subdomain_dgx_t *sub = (bfam_subdomain_dgx_t*)thisSubdomain;
+    add_rates_advection_glue_p(sub,field_prefix_lhs,field_prefix_rhs,
+                             rate_prefix,a);
   }
   else
     BFAM_ABORT("Unknown subdomain: %s",thisSubdomain->name);

@@ -1,8 +1,8 @@
 -- default parameters
 N1 = 3
-N2 = N1+0
-N3 = N2+0
-min_level = 3
+N2 = N1+1
+N3 = N2+1
+min_level = 1
 max_level = 3
 
 ux = 1
@@ -14,6 +14,7 @@ math.randomseed(0)
 
 -- refinement parameters
 output_prefix = "solution_2d"
+data_directory = "data"
 
 -- connectivity info
 connectivity = "brick"
@@ -82,13 +83,14 @@ function element_order(
 end
 
 -- time stepper to use
-lsrk_method  = "KC54"
+local_adams_method  = "Adams 4"
+-- lsrk_method  = "KC54"
 
 tend  = 4*Lx
 tout  = tend/100
-tdisp = tend/10
-terr  = tend/10
-dt_fudge = 0.5
+tdisp = tend/100
+terr  = tend/100
+dt_fudge = 0.5/10
 function time_step_parameters(dt)
   dt      = dt_fudge*dt
   nsteps = math.ceil(tend / dt)

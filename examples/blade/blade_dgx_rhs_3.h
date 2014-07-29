@@ -17,6 +17,11 @@
       bfam_subdomain_dgx_t *sub, const char *field_prefix_lhs,       \
       const char *field_prefix_rhs, const char *rate_prefix,         \
       const bfam_long_real_t a);                                     \
+  void blade_dgx_add_rates_glue_p_3_##order(int N,                   \
+      bfam_subdomain_dgx_t *sub, const char *field_prefix_lhs,       \
+      const char *field_prefix_rhs, const char *rate_prefix,         \
+      const bfam_long_real_t a,                                      \
+      const char** scals, const char** vects, const char** tens);    \
   void blade_dgx_energy_3_##order(int N,                             \
       bfam_real_t* energy_sq, bfam_subdomain_dgx_t *sub,             \
       const char *field_prefix);
@@ -36,6 +41,11 @@ void blade_dgx_add_rates_advection_3_(int N,
     bfam_subdomain_dgx_t *sub, const char *field_prefix_lhs,
     const char *field_prefix_rhs, const char *rate_prefix,
     const bfam_long_real_t a);
+void blade_dgx_add_rates_glue_p_3_(int N,
+    bfam_subdomain_dgx_t *sub, const char *field_prefix_lhs,
+    const char *field_prefix_rhs, const char *rate_prefix,
+    const bfam_long_real_t a,
+    const char** scals, const char** vects, const char** tens);
 void blade_dgx_energy_3_(int N, bfam_real_t *energy_sq,
     bfam_subdomain_dgx_t *sub, const char *field_prefix);
 
