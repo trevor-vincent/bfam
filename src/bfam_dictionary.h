@@ -174,6 +174,9 @@ int bfam_dictionary_allprefixed_ptr(bfam_dictionary_t *t, const char *prefix,
  * It takes a dictionary, \a d, and possibly mutates it such that two \a keys
  * have their associated values swaped on exit
  *
+ * If the keys are the same and the keys are in the dictionary no action is
+ * taken and success is returned.
+ *
  * \param [in,out] d dictionary
  * \param [in] key1 first key
  * \param [in] key2 second key
