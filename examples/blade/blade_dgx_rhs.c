@@ -207,7 +207,11 @@ void blade_dgx_energy(
   }
 }
 
-#define GAM (BFAM_REAL(0))
+/*
+ * GAM = 0  :: Central
+ * GAM = 1  :: upwind
+ */
+#define GAM (BFAM_REAL(1))
 static inline void
 blade_dgx_compute_flux(
     const bfam_real_t   u, const bfam_real_t   qM, const bfam_real_t qP,
@@ -215,7 +219,9 @@ blade_dgx_compute_flux(
 {
   /* compute the state u*q */
   *uqS  = HALF*u*qM; /* half due to the skew-symmetric splitting */
-  *uqS -= HALF*u*(qM+qP);
+  const bfam_real_t ua = BFAM_REAL_ABS(u);
+  *uqS -= HALF*(u+GAM*ua)*qM;
+  *uqS -= HALF*(u-GAM*ua)*qP;
 }
 
 static inline void
