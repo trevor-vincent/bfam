@@ -169,5 +169,22 @@ int bfam_dictionary_allprefixed(bfam_dictionary_t *t, const char *prefix,
 int bfam_dictionary_allprefixed_ptr(bfam_dictionary_t *t, const char *prefix,
                               int (*handle) (const char *, void*, void *),
                               void *arg);
+/** Swap the values stored in two keys in a dictionary
+ *
+ * It takes a dictionary, \a d, and possibly mutates it such that two \a keys
+ * have their associated values swaped on exit
+ *
+ * \param [in,out] d dictionary
+ * \param [in] key1 first key
+ * \param [in] key2 second key
+ * \returns:
+ *   $\cases{ 0 &if {\rm out of memory} \cr
+ *            1 &if {\it key1} {\rm is not a member} \cr
+ *            2 &if {\it key2} {\rm is not a member} \cr
+ *            3 &if {\it d} {\rm was mutated successfully}}$.
+ */
+int bfam_dictionary_swap(bfam_dictionary_t *d, const char *key1,
+                                               const char *key2);
+
 
 #endif

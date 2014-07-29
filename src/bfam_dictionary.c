@@ -199,3 +199,57 @@ int bfam_dictionary_allprefixed_ptr(bfam_dictionary_t *d, const char *prefix,
   return bfam_critbit0_allprefixed(&(d->t),prefix,
       &bfam_dictionary_allprefixed_usercall_ptr,&args);
 }
+
+int bfam_dictionary_swap(bfam_dictionary_t *d, const char *key1,
+                                               const char *key2)
+{
+  char* t_val1 = bfam_dictionary_get_value(d,key1);
+  if(!t_val1) return 1;
+
+  /* return done if the keys are the same */
+  if(0==strcmp(key1,key2)) return 3;
+
+  char* t_val2 = bfam_dictionary_get_value(d,key2);
+  if(!t_val2) return 2;
+
+
+  /* Delete the first key-value pair */
+  const size_t k1len = strlen(key1);
+  const size_t v1len = strlen(t_val1);
+  char *kv1 = bfam_malloc(sizeof(char)*(k1len+v1len+2));
+  memcpy(kv1, key1, k1len);
+  kv1[k1len]   = BFAM_KEYVALUE_SPLIT;
+  memcpy(&kv1[k1len+1], t_val1, v1len);
+  kv1[k1len+v1len+1] = '\0';
+  bfam_critbit0_delete(&(d->t), kv1);
+
+  /* Delete the second key-value pair */
+  const size_t k2len = strlen(key2);
+  const size_t v2len = strlen(t_val2);
+  char *kv2 = bfam_malloc(sizeof(char)*(k2len+v2len+2));
+  memcpy(kv2, key2, k2len);
+  kv2[k2len]   = BFAM_KEYVALUE_SPLIT;
+  memcpy(&kv2[k2len+1], t_val2, v2len);
+  kv2[k2len+v2len+1] = '\0';
+  bfam_critbit0_delete(&(d->t), kv2);
+
+  /* re-insert the swapped values */
+  int rval = bfam_dictionary_insert(d,key1,&kv2[k2len+1]);
+  BFAM_ASSERT(rval != 1);
+  bfam_free(kv2);
+  kv2 = NULL;
+  if(rval == 0)
+  {
+    bfam_free(kv1);
+    kv1 = NULL;
+    return rval;
+  }
+
+  rval = bfam_dictionary_insert(d,key2,&kv1[k1len+1]);
+  BFAM_ASSERT(rval != 1);
+  bfam_free(kv1);
+  kv1 = NULL;
+  if(rval == 0) return rval;
+
+  return 3;
+}

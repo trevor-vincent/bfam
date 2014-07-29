@@ -121,6 +121,44 @@ test_contains_ptr()
 }
 
 static void
+test_swap()
+{
+  bfam_dictionary_t dict;
+  bfam_dictionary_init(&dict);
+
+  static const char *keys[] = {"@^1", "@2","^3","@^44",NULL};
+  static const char *keys2[] = {"adsf",NULL};
+
+  static const bfam_locidx_t values[] = {1,2,3,44};
+
+  for (unsigned i = 0; keys[i]; ++i)
+    bfam_dictionary_insert_locidx(&dict, keys[i], values[i]);
+
+  if(1 != bfam_dictionary_swap(&dict, keys2[0], keys[0]))
+      BFAM_ABORT("key1 invalid fail");
+
+  if(2 != bfam_dictionary_swap(&dict, keys[0], keys2[0]))
+      BFAM_ABORT("key2 invalid fail");
+
+  if(3 != bfam_dictionary_swap(&dict, keys[0], keys[2]))
+      BFAM_ABORT("swap fail");
+
+  static const bfam_locidx_t vals_swap[] = {3,2,1,44};
+
+  for (unsigned i = 0; keys[i]; ++i)
+  {
+    bfam_locidx_t val;
+    int rval = bfam_dictionary_get_value_locidx(&dict, keys[i], &val);
+    if(rval != 1 || val != vals_swap[i])
+      BFAM_ABORT("Return is key after swap fail");
+  }
+
+
+  bfam_dictionary_clear(&dict);
+}
+
+
+static void
 test_contains_locidx()
 {
   bfam_dictionary_t dict;
@@ -162,6 +200,7 @@ main (int argc, char *argv[])
   test_contains();
   test_contains_ptr();
   test_contains_locidx();
+  test_swap();
 
   return EXIT_SUCCESS;
 }
