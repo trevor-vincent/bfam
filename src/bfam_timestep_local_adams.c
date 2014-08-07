@@ -535,7 +535,7 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     bfam_dictionary_allprefixed_ptr(&ts->elems,
         "",&bfam_ts_local_adams_inter_rhs,&data);
 
-    /* Do the inter work for the levels to be updated */
+    /* Do the local update */
     bfam_dictionary_allprefixed_ptr(&ts->elems,
         "",&bfam_ts_local_adams_update,&data);
 
