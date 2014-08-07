@@ -519,7 +519,7 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     sub_comm_data->user_data = &data;
     bfam_communicator_start(ts->comm_array[comm_lvl]);
 
-    /* Do the intra work for the levels to be udpated */
+    /* Do the intra work for the levels to be updated */
     bfam_dictionary_allprefixed_ptr(&ts->elems,
         "",&bfam_ts_local_adams_intra_rhs,&data);
 
@@ -531,11 +531,11 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     sub_comm_data->user_data = NULL;
     sub_comm_data->user_prefix_function = NULL;
 
-    /* Do the inter work for the levels to be udpated */
+    /* Do the inter work for the levels to be updated */
     bfam_dictionary_allprefixed_ptr(&ts->elems,
         "",&bfam_ts_local_adams_inter_rhs,&data);
 
-    /* Do the inter work for the levels to be udpated */
+    /* Do the inter work for the levels to be updated */
     bfam_dictionary_allprefixed_ptr(&ts->elems,
         "",&bfam_ts_local_adams_update,&data);
 
