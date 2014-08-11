@@ -492,25 +492,39 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     BFAM_LDEBUG("local time step number %"BFAM_LOCIDX_PRId, step);
     data.lvl = 0;
 
-    /* loop through the levels */
-    for(bfam_locidx_t lvl = 0; lvl < ts->numLevels; lvl++)
-    {
-      bfam_locidx_t chk = 1 << lvl;
-      if(!(step%chk))
+    /* If lsrk id allocated, then we are still in the initialization phase,
+     * which means we want all levels to communicate and compute rates. Thus we
+     * use data.lvl = ts->numLevels-1;
+     *
+     * otherwise we need to check to see how who gets updated at this step
+     */
+    if(ts->lsrk)
+      data.lvl = ts->numLevels-1;
+    else
+      for(bfam_locidx_t lvl = 0; lvl < ts->numLevels; lvl++)
       {
-        BFAM_LDEBUG("level %"BFAM_LOCIDX_PRId" to be updated",lvl);
-        data.lvl = BFAM_MAX(data.lvl, lvl);
+        bfam_locidx_t chk = 1 << lvl;
+        if(!(step%chk))
+        {
+          BFAM_LDEBUG("level %"BFAM_LOCIDX_PRId" to be updated",lvl);
+          data.lvl = BFAM_MAX(data.lvl, lvl);
+        }
       }
-    }
+
+    /* comm level is the max of this level and the last level updated */
     bfam_locidx_t comm_lvl = BFAM_MAX(data.lvl, last_lvl);
     BFAM_LDEBUG("step %02"BFAM_LOCIDX_PRId
         ": update level %02"BFAM_LOCIDX_PRId
         ": and communication level %02"BFAM_LOCIDX_PRId,
         step, data.lvl, comm_lvl);
 
-    /* start the communication */
+    /* start the communication for the communication level */
     bfam_subdomain_comm_args_t* sub_comm_data =
       (bfam_subdomain_comm_args_t*) ts->comm_array[comm_lvl]->user_args;
+
+    /* This just makes sure we won't kill anything later, if we do then we need
+     * to rethink what we are doing here
+     */
     BFAM_ASSERT(sub_comm_data);
     BFAM_ASSERT(sub_comm_data->user_data == NULL);
     BFAM_ASSERT(sub_comm_data->user_prefix_function == NULL);
@@ -535,9 +549,32 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     bfam_dictionary_allprefixed_ptr(&ts->elems,
         "",&bfam_ts_local_adams_inter_rhs,&data);
 
-    /* Do the local update */
-    bfam_dictionary_allprefixed_ptr(&ts->elems,
-        "",&bfam_ts_local_adams_update,&data);
+    if(ts->lsrk)
+    {
+      /*
+       * If we are using RK, we want to tell the RK scheme to use the next rate
+       * for storage (not the current rate which is valid)
+       */
+      ts->lsrk->t = ts->t;
+      char rate_prefix[BFAM_BUFSIZ];
+      /* THIS ASSUMES THAT ALL THE RATES ARE AT THE SAME LEVEL INITIALLY */
+      snprintf(rate_prefix,BFAM_BUFSIZ,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
+          (ts->currentStageArray[0]+1)%ts->nStages);
+      BFAM_LDEBUG("Local Adams step: RK rate rate_prefix %s",rate_prefix);
+      BFAM_ASSERT(ts->lsrk->step_extended);
+      ts->lsrk->step_extended((bfam_ts_t*)ts->lsrk,dt,rate_prefix,"","");
+      ts->numLSRKsteps++;
+      if(ts->numLSRKsteps+1 >= ts->nStages)
+      {
+        bfam_ts_lsrk_free(ts->lsrk);
+        bfam_free(ts->lsrk);
+        ts->lsrk = NULL;
+      }
+    }
+    else
+      /* Do the local update */
+      bfam_dictionary_allprefixed_ptr(&ts->elems,
+          "",&bfam_ts_local_adams_update,&data);
 
     /* set last update to next update */
     last_lvl = data.lvl;
@@ -616,6 +653,7 @@ bfam_ts_local_adams_init(
     ts->numStepsArray[k] = 0;
     ts->currentStageArray[k] = 0;
   }
+  ts->numLSRKsteps = 0;
 
   ts->lsrk         = NULL;
   ts->comm_array   = NULL;

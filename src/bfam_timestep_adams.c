@@ -173,7 +173,7 @@ bfam_ts_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
   {
     /*
      * If we are using RK, we want to tell the RK scheme to use the next rate
-     * for storage (not the current rate which is valid
+     * for storage (not the current rate which is valid)
      */
     ts->lsrk->t = ts->t;
     char rate_prefix[BFAM_BUFSIZ];

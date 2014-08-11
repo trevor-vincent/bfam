@@ -33,6 +33,7 @@ typedef struct bfam_ts_local_adams
 
   /* LSRK method for initialization */
   bfam_ts_lsrk_t* lsrk;
+  bfam_locidx_t   numLSRKsteps;    /**< tracks number of RK steps */
 
   /* scale rates function */
   void (*scale_rates) (bfam_subdomain_t *thisSubdomain,
