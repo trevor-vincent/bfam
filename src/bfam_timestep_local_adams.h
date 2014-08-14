@@ -32,8 +32,12 @@ typedef struct bfam_ts_local_adams
   bfam_dictionary_t elems;          /**< dictionary of subdomains I step */
 
   /* LSRK method for initialization */
-  bfam_ts_lsrk_t* lsrk;
-  bfam_locidx_t   numLSRKsteps;    /**< tracks number of RK steps */
+  bfam_ts_lsrk_t* lsrk; bfam_locidx_t   numLSRKsteps; /**< tracks number of RK
+                                                        steps */ bfam_locidx_t**
+  lvlStepArray; /**< track the level that each stage is at*/ bfam_locidx_t
+    effNumLvls;   /**< effective number of levels tracks whether we are time
+                       stepping the slower levels as faster levels
+                   */
 
   /* scale rates function */
   void (*scale_rates) (bfam_subdomain_t *thisSubdomain,

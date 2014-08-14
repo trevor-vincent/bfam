@@ -344,8 +344,8 @@ bfam_ts_local_adams_inter_rhs(const char * key, void *val, void *arg)
   }
 
   /*
-   * Determine if the minus side exists and whether imterpolation need to occure
-   * on the plus side
+   * Determine if the minus side exists and whether interpolation needs to
+   * occur on the plus side
    */
   bfam_locidx_t m_lvl = -1;
   if(sub->glue_m && sub->glue_m->sub_m)
@@ -490,26 +490,29 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     data.step = step;
 
     BFAM_LDEBUG("local time step number %"BFAM_LOCIDX_PRId, step);
+    BFAM_LDEBUG("slowest effective level is %"BFAM_LOCIDX_PRId, ts->effNumLvls);
     data.lvl = 0;
 
-    /* If lsrk id allocated, then we are still in the initialization phase,
-     * which means we want all levels to communicate and compute rates. Thus we
-     * use data.lvl = ts->numLevels-1;
-     *
-     * otherwise we need to check to see how who gets updated at this step
-     */
-    if(ts->lsrk)
-      data.lvl = ts->numLevels-1;
-    else
-      for(bfam_locidx_t lvl = 0; lvl < ts->numLevels; lvl++)
+    /* check to see what level we are stepping */
+    for(bfam_locidx_t lvl = 0; lvl < ts->numLevels; lvl++)
+    {
+      bfam_locidx_t chk = 1 << lvl;
+      if(!(step%chk))
       {
-        bfam_locidx_t chk = 1 << lvl;
-        if(!(step%chk))
-        {
-          BFAM_LDEBUG("level %"BFAM_LOCIDX_PRId" to be updated",lvl);
-          data.lvl = BFAM_MAX(data.lvl, lvl);
-        }
+        BFAM_LDEBUG("level %"BFAM_LOCIDX_PRId" to be updated",lvl);
+        data.lvl = BFAM_MAX(data.lvl, lvl);
       }
+    }
+
+    /* If effNumLvls is smaller than (or equal) to the level we are stepping by
+     * above calculation, then we really want to step all the levels (since
+     * slower guys are currently stepping faster). Thus, we set the data lvl to
+     * the real number of levels minus 1
+     */
+    if(data.lvl >= ts->effNumLvls-1)
+    {
+      data.lvl = ts->numLevels-1;
+    }
 
     /* comm level is the max of this level and the last level updated */
     bfam_locidx_t comm_lvl = BFAM_MAX(data.lvl, last_lvl);
@@ -551,6 +554,8 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
 
     if(ts->lsrk)
     {
+      bfam_locidx_t stage = (ts->currentStageArray[0]+1)%ts->nStages;
+
       /*
        * If we are using RK, we want to tell the RK scheme to use the next rate
        * for storage (not the current rate which is valid)
@@ -559,17 +564,25 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
       char rate_prefix[BFAM_BUFSIZ];
       /* THIS ASSUMES THAT ALL THE RATES ARE AT THE SAME LEVEL INITIALLY */
       snprintf(rate_prefix,BFAM_BUFSIZ,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
-          (ts->currentStageArray[0]+1)%ts->nStages);
+          stage);
       BFAM_LDEBUG("Local Adams step: RK rate rate_prefix %s",rate_prefix);
       BFAM_ASSERT(ts->lsrk->step_extended);
       ts->lsrk->step_extended((bfam_ts_t*)ts->lsrk,dt,rate_prefix,"","");
       ts->numLSRKsteps++;
+
+      /* Set the time step that each stage is at (or at least will be when the
+       * next rate is calculated)
+       */
+      for(bfam_locidx_t k = 0; k < ts->numLevels;k++)
+        ts->lvlStepArray[k][stage] = ts->numLSRKsteps;
+
       if(ts->numLSRKsteps+1 >= ts->nStages)
       {
         bfam_ts_lsrk_free(ts->lsrk);
         bfam_free(ts->lsrk);
         ts->lsrk = NULL;
       }
+
     }
     else
       /* Do the local update */
@@ -640,20 +653,6 @@ bfam_ts_local_adams_init(
   ts->add_rates        = add_rates;
   ts->add_rates_glue_p = add_rates_glue_p;
 
-  /*
-   * fast log2 computation for ints using bitwise operations from
-   * http://stackoverflow.com/questions/994593/how-to-do-an-integer-log2-in-c
-   */
-  ts->numLevels = num_lvl;
-
-  ts->currentStageArray = bfam_malloc(ts->numLevels*sizeof(bfam_locidx_t));
-  ts->numStepsArray     = bfam_malloc(ts->numLevels*sizeof(bfam_locidx_t));
-  for(bfam_locidx_t k = 0; k < ts->numLevels; k++)
-  {
-    ts->numStepsArray[k] = 0;
-    ts->currentStageArray[k] = 0;
-  }
-  ts->numLSRKsteps = 0;
 
   ts->lsrk         = NULL;
   ts->comm_array   = NULL;
@@ -707,6 +706,33 @@ bfam_ts_local_adams_init(
       }
       break;
   }
+
+  ts->numLevels = num_lvl;
+  ts->currentStageArray = bfam_malloc(ts->numLevels*sizeof(bfam_locidx_t));
+  ts->numStepsArray     = bfam_malloc(ts->numLevels*sizeof(bfam_locidx_t));
+  if(RK_init)
+  {
+    ts->effNumLvls = 1;
+    ts->lvlStepArray = bfam_malloc(ts->numLevels*sizeof(bfam_locidx_t));
+  }
+  else
+  {
+    ts->lvlStepArray = NULL;
+    ts->effNumLvls = num_lvl;
+  }
+  for(bfam_locidx_t k = 0; k < ts->numLevels; k++)
+  {
+    ts->numStepsArray[k] = 0;
+    ts->currentStageArray[k] = 0;
+    if(ts->lvlStepArray)
+    {
+      ts->lvlStepArray[k] = bfam_malloc(ts->numLevels*sizeof(bfam_locidx_t));
+      for(bfam_locidx_t j = 0; j < ts->nStages; j++)
+        ts->lvlStepArray[k][j] = 0;
+    }
+  }
+  ts->numLSRKsteps = 0;
+
 
   /*
    * get the subdomains and create rates we will need
@@ -823,9 +849,13 @@ bfam_ts_local_adams_free(bfam_ts_local_adams_t* ts)
     bfam_communicator_free(ts->comm_array[k]);
     bfam_free(ts->comm_array[k]);
     ts->comm_array[k] = NULL;
+    if(ts->lvlStepArray)
+      bfam_free(ts->lvlStepArray[k]);
   }
   bfam_free(ts->comm_array);
   bfam_dictionary_clear(&ts->elems);
+  if(ts->lvlStepArray)
+    bfam_free(ts->lvlStepArray);
   /*
   bfam_free_aligned(ts->A);
   ts->A = NULL;
