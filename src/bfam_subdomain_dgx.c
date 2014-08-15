@@ -348,6 +348,7 @@ bfam_subdomain_dgx_get_recv_buffer(bfam_subdomain_t *thisSubdomain,
     if(args->user_prefix_function)
       args->user_prefix_function(thisSubdomain, prefix, BFAM_BUFSIZ,
                                  args->user_data);
+    BFAM_LDEBUG("Using communicator prefix '%s'",prefix);
 
     for(int s = 0; args->scalars_p[s] != NULL;s++)
     {
