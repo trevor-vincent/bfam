@@ -488,7 +488,8 @@ bfam_ts_local_adams_step(bfam_ts_t *a_ts, bfam_long_real_t dt)
     data.step = step;
 
     BFAM_LDEBUG("local time step number %"BFAM_LOCIDX_PRId, step);
-    BFAM_LDEBUG("slowest effective level is %"BFAM_LOCIDX_PRId, ts->effNumLvls);
+    BFAM_LDEBUG("Number of effective levels is %"BFAM_LOCIDX_PRId,
+        ts->effNumLvls);
     data.lvl = 0;
 
     /* check to see what level we are stepping */
