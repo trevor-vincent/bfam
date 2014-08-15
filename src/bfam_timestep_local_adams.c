@@ -5,7 +5,7 @@
 #define BFAM_LOCAL_ADAMS_LVL_PREFIX "_local_adams_lvl_"
 #define BFAM_LOCAL_ADAMS_COMM_LVL_PREFIX ("_local_adams_comm_lvl_")
 
-/* #define BFAM_LOCAL_ADAMS_ALWAYS_INTERP */
+#define BFAM_LOCAL_ADAMS_ALWAYS_INTERP
 
 typedef struct bfam_ts_local_allprefix
 {
@@ -57,20 +57,29 @@ comm_send_prefix(bfam_subdomain_t *sub,
     (bfam_ts_local_adams_allprefix_t*) user_data;
   BFAM_ASSERT(data);
 
+#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+  /*
+   * If I step at the same rate or faster than my neighbor (and I have done
+   * atleast one step) then we send the rates.
+   *
+   * (The one step is b/c the first time we want to exchange the initial
+   * condition)
+   */
+  if(data->ts->numStepsArray[m_lvl] > 0 && m_lvl <= p_lvl)
+#else
   /*
    * send the rates if my level number is greater than my neighbors
    * and I am not being not being updated (i.e., my level is greater
    * than the updated level number)
-   *
-   * We have to shift back on b/c the stage number has already been moved
-   * forward by 1
    */
-#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
-  if(data->ts->numStepsArray[m_lvl] > 0)
-#else
   if(p_lvl < m_lvl && data->lvl < m_lvl)
 #endif
   {
+    /*
+     *
+     * We have to shift back on b/c the stage number has already been moved
+     * forward by 1
+     */
     snprintf(prefix,buf_siz,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
         (data->ts->currentStageArray[m_lvl]+data->ts->nStages-1)
         %data->ts->nStages);
@@ -100,20 +109,28 @@ comm_recv_prefix(bfam_subdomain_t *sub,
     (bfam_ts_local_adams_allprefix_t*) user_data;
   BFAM_ASSERT(data);
 
+#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+  /*
+   * If I step at the same rate or slower than my neighbor (and I have done
+   * atleast one step) then we recv the rates.
+   *
+   * (The one step is b/c the first time we want to exchange the initial
+   * condition)
+   */
+  if(data->ts->numStepsArray[m_lvl] > 0 && m_lvl <= p_lvl)
+#else
   /*
    * recv the rates if neigh level number is greater than my level
    * and neighbor is not being not being updated (i.e., neighbors level is
    * greater than the updated level number)
-   *
-   * We have to shift back on b/c the stage number has already been moved
-   * forward by 1
    */
-#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
-  if(data->ts->numStepsArray[m_lvl] > 0)
-#else
   if(m_lvl < p_lvl && data->lvl < p_lvl)
 #endif
   {
+   /*
+   * We have to shift back on b/c the stage number has already been moved
+   * forward by 1
+   */
     snprintf(prefix,buf_siz,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
         (data->ts->currentStageArray[p_lvl]+data->ts->nStages-1)
         %data->ts->nStages);
@@ -344,13 +361,17 @@ bfam_ts_local_adams_inter_rhs(const char * key, void *val, void *arg)
       bfam_critbit0_allprefixed(&sub->glue_p->tags,
           BFAM_LOCAL_ADAMS_LVL_PREFIX, get_tag_level_number,&p_lvl);
 
+#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+    /*
+     * If my update rate is faster than or equal to my neighbors then
+     * interpolate (assume we have at least exchanged the initial condition)
+     */
+    if(data->ts->numStepsArray[m_lvl] > 0 && m_lvl <= p_lvl)
+#else
     /*
      * If my level is less than my neighbor and my neighbor is not being updated
      * then do the interpolation
      */
-#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
-    if(data->ts->numStepsArray[m_lvl] > 0)
-#else
     if(m_lvl < p_lvl && p_lvl > data->lvl)
 #endif
     {
