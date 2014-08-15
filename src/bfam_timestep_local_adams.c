@@ -132,8 +132,8 @@ bfam_ts_local_adams_new(bfam_domain_t* dom, bfam_ts_local_adams_method_t method,
     void (*scale_rates) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const bfam_long_real_t a),
     void (*intra_rhs) (bfam_subdomain_t *thisSubdomain,
-      const char *rate_prefix, const char *minus_rate_prefix,
-      const char *field_prefix, const bfam_long_real_t t),
+      const char *rate_prefix, const char *field_prefix,
+      const bfam_long_real_t t),
     void (*inter_rhs) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const char *minus_rate_prefix,
       const char *field_prefix, const bfam_long_real_t t),
@@ -173,32 +173,9 @@ bfam_ts_local_adams_intra_rhs(const char * key, void *val, void *arg)
         data->ts->currentStageArray[lvl]%data->ts->nStages);
     BFAM_LDEBUG("Local Adams intra: level %"BFAM_LOCIDX_PRId
         " using rate prefix %s",lvl,rate_prefix_storage);
-  }
-
-  bfam_locidx_t m_lvl = -1;
-  if(sub->glue_m && sub->glue_m->sub_m)
-    bfam_critbit0_allprefixed(&sub->glue_m->sub_m->tags,
-        BFAM_LOCAL_ADAMS_LVL_PREFIX, get_tag_level_number,&m_lvl);
-  char *minus_rate_prefix = NULL;
-  char minus_rate_prefix_storage[BFAM_BUFSIZ];
-#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
-  if(data->ts->numStepsArray[m_lvl] > 0)
-#else
-  if(m_lvl > -1 && m_lvl <= data->lvl)
-#endif
-  {
-    minus_rate_prefix = minus_rate_prefix_storage;
-    snprintf(minus_rate_prefix_storage,BFAM_BUFSIZ,"%s%d_",
-        BFAM_LOCAL_ADAMS_PREFIX,
-        data->ts->currentStageArray[m_lvl]%data->ts->nStages);
-    BFAM_LDEBUG("Local Adams intra: level %"BFAM_LOCIDX_PRId
-        " using minus rate prefix %s",m_lvl,minus_rate_prefix_storage);
-  }
-
-  if(rate_prefix)
     data->ts->scale_rates(sub, rate_prefix, 0);
-  if(rate_prefix || minus_rate_prefix)
-    data->ts->intra_rhs(sub, rate_prefix, minus_rate_prefix, "", data->ts->t);
+    data->ts->intra_rhs(sub, rate_prefix, "", data->ts->t);
+  }
 
   return 1;
 }
@@ -621,7 +598,7 @@ bfam_ts_local_adams_init(
     void (*scale_rates) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const bfam_long_real_t a),
     void (*intra_rhs) (bfam_subdomain_t *thisSubdomain,
-      const char *rate_prefix, const char *minus_rate_prefix,
+      const char *rate_prefix,
       const char *field_prefix, const bfam_long_real_t t),
     void (*inter_rhs) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const char *minus_rate_prefix,

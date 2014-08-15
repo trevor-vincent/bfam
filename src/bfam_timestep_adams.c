@@ -18,7 +18,7 @@ bfam_ts_adams_new(bfam_domain_t* dom, bfam_ts_adams_method_t method,
     void (*scale_rates) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const bfam_long_real_t a),
     void (*intra_rhs) (bfam_subdomain_t *thisSubdomain,
-      const char *rate_prefix, const char *minus_rate_prefix,
+      const char *rate_prefix,
       const char *field_prefix, const bfam_long_real_t t),
     void (*inter_rhs) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const char *minus_rate_prefix,
@@ -118,7 +118,7 @@ bfam_ts_adams_intra_rhs(const char * key, void *val, void *arg)
       data->ts->currentStage%data->ts->nStages);
   BFAM_LDEBUG("Adams intra: using prefix %s",prefix);
   data->ts->scale_rates(sub, prefix, 0);
-  data->ts->intra_rhs(sub, prefix, prefix, "", data->ts->t);
+  data->ts->intra_rhs(sub, prefix, "", data->ts->t);
   return 1;
 }
 
@@ -219,7 +219,7 @@ bfam_ts_adams_init(
     void (*scale_rates) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const bfam_long_real_t a),
     void (*intra_rhs) (bfam_subdomain_t *thisSubdomain,
-      const char *rate_prefix, const char *minus_rate_prefix,
+      const char *rate_prefix,
       const char *field_prefix, const bfam_long_real_t t),
     void (*inter_rhs) (bfam_subdomain_t *thisSubdomain,
       const char *rate_prefix, const char *minus_rate_prefix,

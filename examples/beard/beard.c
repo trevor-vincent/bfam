@@ -1756,8 +1756,7 @@ intra_rhs_elastic(int N, bfam_subdomain_dgx_t *sub,
 }
 
 void intra_rhs (bfam_subdomain_t *thisSubdomain, const char *rate_prefix,
-    const char *minus_rate_prefix, const char *field_prefix,
-    const bfam_long_real_t t)
+    const char *field_prefix, const bfam_long_real_t t)
 {
   BFAM_ASSERT(bfam_subdomain_has_tag(thisSubdomain,"_subdomain_dgx"));
 
