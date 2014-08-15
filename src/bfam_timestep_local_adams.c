@@ -5,7 +5,9 @@
 #define BFAM_LOCAL_ADAMS_LVL_PREFIX "_local_adams_lvl_"
 #define BFAM_LOCAL_ADAMS_COMM_LVL_PREFIX ("_local_adams_comm_lvl_")
 
+/*
 #define BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+*/
 
 typedef struct bfam_ts_local_allprefix
 {
@@ -59,20 +61,20 @@ comm_send_prefix(bfam_subdomain_t *sub,
 
 #ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
   /*
-   * If I step at the same rate or faster than my neighbor (and I have done
-   * atleast one step) then we send the rates.
+   * If my level number of greater than (or equal to) my neighbors, then I need
+   * to send rates to my neighbor because I step slower.
    *
    * (The one step is b/c the first time we want to exchange the initial
    * condition)
    */
-  if(data->ts->numStepsArray[m_lvl] > 0 && m_lvl <= p_lvl)
+  if(data->ts->numStepsArray[m_lvl] > 0 && m_lvl >= p_lvl)
 #else
   /*
-   * send the rates if my level number is greater than my neighbors
-   * and I am not being not being updated (i.e., my level is greater
-   * than the updated level number)
+   * If my level number of greater than my neighbors and my level number of
+   * greater than the level being updated (i.e., I am not being updated), then I
+   * need to send rates to my neighbor because I step slower.
    */
-  if(p_lvl < m_lvl && data->lvl < m_lvl)
+  if(m_lvl > p_lvl && data->lvl < m_lvl)
 #endif
   {
     /*
@@ -83,7 +85,8 @@ comm_send_prefix(bfam_subdomain_t *sub,
     snprintf(prefix,buf_siz,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
         (data->ts->currentStageArray[m_lvl]+data->ts->nStages-1)
         %data->ts->nStages);
-    BFAM_LDEBUG("send: %d %d %d %s",data->lvl, m_lvl, p_lvl, prefix);
+    BFAM_LDEBUG("send: lvl = %d :: m_lvl = %d :: p_lvl = %d prefix = %s",
+        data->lvl, m_lvl, p_lvl, prefix);
   }
 }
 
@@ -111,8 +114,8 @@ comm_recv_prefix(bfam_subdomain_t *sub,
 
 #ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
   /*
-   * If I step at the same rate or slower than my neighbor (and I have done
-   * atleast one step) then we recv the rates.
+   * If my level number of smaller than (or equal to) my neighbors, then I need
+   * to send rates to my neighbor because I step faster.
    *
    * (The one step is b/c the first time we want to exchange the initial
    * condition)
@@ -120,9 +123,9 @@ comm_recv_prefix(bfam_subdomain_t *sub,
   if(data->ts->numStepsArray[m_lvl] > 0 && m_lvl <= p_lvl)
 #else
   /*
-   * recv the rates if neigh level number is greater than my level
-   * and neighbor is not being not being updated (i.e., neighbors level is
-   * greater than the updated level number)
+   * If my level number of smaller than my neighbors and my neighbors level
+   * number of greater than the level number (i.e., my neighbor is not
+   * updating), then I need to send rates to my neighbor because I step faster.
    */
   if(m_lvl < p_lvl && data->lvl < p_lvl)
 #endif
@@ -134,7 +137,8 @@ comm_recv_prefix(bfam_subdomain_t *sub,
     snprintf(prefix,buf_siz,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
         (data->ts->currentStageArray[p_lvl]+data->ts->nStages-1)
         %data->ts->nStages);
-    BFAM_LDEBUG("recv: %d %d %d %s",data->lvl, m_lvl, p_lvl, prefix);
+    BFAM_LDEBUG("recv: lvl = %d :: m_lvl = %d :: p_lvl = %d prefix = %s",
+        data->lvl, m_lvl, p_lvl, prefix);
   }
 }
 
@@ -211,36 +215,37 @@ interp_fields(bfam_ts_local_adams_allprefix_t* data,
   BFAM_ASSERT(sub_comm_data->user_data == NULL);
   BFAM_ASSERT(sub_comm_data->user_prefix_function == NULL);
   sub->glue_put_send_buffer(sub, NULL, 0, sub_comm_data);
-#ifndef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+
+  /* Determine my step size and my neighbors */
+  const bfam_locidx_t m_sz = (1<<m_lvl);
+  const bfam_locidx_t p_sz = (1<<p_lvl);
+
+  /* Assert the minus step size is faster than the plus size */
+#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+  BFAM_ASSERT(m_lvl <= p_lvl);
+#else
   BFAM_ASSERT(m_lvl < p_lvl && p_lvl > data->lvl);
 #endif
 
-  /* last time the plus and minu sides were updated */
-  bfam_locidx_t m_last = (1<<m_lvl)*(data->step/(1<<m_lvl) - 1);
-  bfam_locidx_t p_last = (1<<p_lvl)*(data->step/(1<<p_lvl)    );
+  /* figure out when the minus and plus sides last updated */
+  const bfam_locidx_t m_last_step = data->step - m_sz;
+  const bfam_locidx_t p_last_step = p_sz*(((data->step+p_sz-1)/p_sz)-1);
 
-  /* the amount the plus field is ahead of actual field */
-  bfam_locidx_t p_delta = m_last - p_last;
+  /* Now get the integration limits */
+  const bfam_locidx_t a = m_last_step-p_last_step;
+  const bfam_locidx_t b = a + m_sz;
+  const bfam_locidx_t d = p_sz;
 
-
-  /*
-   * When doing the interpolation we assume that the guy whose rates we are
-   * updating have steps that are size 1 apart, thus a is the fraction of the
-   * step he has already done and b is the fraction of the step we are about to
-   * do, that is, we need to add the rate
-   *   \int_{a}^{b} f(q,t) dt
-   * to the current field values
-   */
-  bfam_long_real_t a =   (bfam_long_real_t)p_delta
-                       / (bfam_long_real_t)(1<<p_lvl);
-
-  bfam_long_real_t b =   (bfam_long_real_t)(p_delta+(1<<m_lvl))
-                       / (bfam_long_real_t)(1<<p_lvl);
-
-  BFAM_LDEBUG("lvl %2d :: ngh lvl %2d"
-      " :: last  %2d :: ngh last  %2d :: ngh delta %d"
-      " :: a = %"BFAM_LONG_REAL_PRIe" :: b = %"BFAM_LONG_REAL_PRIe,
-      m_lvl, p_lvl, m_last, p_last, p_delta,a,b);
+  BFAM_LDEBUG(
+      "step %2"BFAM_LOCIDX_PRId
+      " :: lvl %2"BFAM_LOCIDX_PRId
+      " :: ngh lvl %2"BFAM_LOCIDX_PRId
+      " :: last  %2"BFAM_LOCIDX_PRId
+      " :: ngh last  %2"BFAM_LOCIDX_PRId
+      " :: d = %"BFAM_LOCIDX_PRId
+      " :: a = %"BFAM_LOCIDX_PRId
+      " :: b = %"BFAM_LOCIDX_PRId,
+      data->step, m_lvl, p_lvl, m_last_step, p_last_step, d,a,b);
 
   /*
    * we have to look at the p_lvl because these are the guys we are
@@ -254,54 +259,64 @@ interp_fields(bfam_ts_local_adams_allprefix_t* data,
     case 1:
       {
         /* \int_{a}^{b} 1 dt */
-        A[0] = b-a;
+        A[0] = (bfam_long_real_t)(b-a);
       }
       break;
     case 2:
       {
-        /* \int_{a}^{b} (t+1) dt */
-        A[0] = (-a*a-2*a+b*b+2*b)/2;
+        /* Integrate[(t + d)/(0 + d), {t, a, b}] // Together */
+        A[0] = (bfam_long_real_t)(-a*a + b*b - 2*a*d + 2*b*d) /
+               (bfam_long_real_t)(2*d);
 
-        /* \int_{a}^{b} -t dt */
-        A[1] = (a*a-b*b)/2;
+        /* Integrate[(t)/(-d), {t, a, b}] // Together */
+        A[1] = (bfam_long_real_t)(a*a-b*b) / (bfam_long_real_t)(2*d);
       }
       break;
     case 3:
       {
-        /* \int_{a}^{b} (t+1)(t+2)/2 dt */
-        A[0] = (-2*a*a*a-9*a*a-12*a+2*b*b*b+9*b*b+12*b)/12;
+        /* Integrate[(t + d) (t + 2 d)/((0 + d) (0 + 2 d)), {t, a, b}] //  Together */
+        A[0] = (bfam_long_real_t)(-2*a*a*a + 2*b*b*b - 9*a*a*d
+                                 + 9*b*b*d - 12*a*d*d + 12*b*d*d) /
+               (bfam_long_real_t)(12*d*d);
 
-        /* \int_{a}^{b} t(t+2)/(-1) dt */
-        A[1] = (a*a*a+3*a*a-b*b*b-3*b*b)/3;
+        /* Integrate[(t) (t + 2 d)/((-d) (-d + 2 d)), {t, a, b}] // Together */
+        A[1] = (bfam_long_real_t)(a*a*a - b*b*b + 3*a*a*d - 3*b*b*d) /
+               (bfam_long_real_t)(3*d*d);
 
-        /* \int_{a}^{b} t(t+1)/2 dt */
-        A[2] = (-2*a*a*a-3*a*a+2*b*b*b+3*b*b)/12;
+        /* Integrate[(t) (t + d)/((-2 d) (-2 d + d)), {t, a, b}] // Together */
+        A[2] = (bfam_long_real_t)(-2*a*a*a + 2*b*b*b - 3*a*a*d + 3*b*b*d) /
+               (bfam_long_real_t)(12*d*d);
+
         break;
       }
     case 4:
       {
-        /* \int_{a}^{b} (t+1)(t+2)(t+3)/6 dt */
-        A[0] = (-a*a*a*a-8*a*a*a-22*a*a-24*a
-                +b*b*b*b+8*b*b*b+22*b*b+24*b)/24;
+        /* Integrate[(t + d) (t + 2 d) (t + 3 d)/((0 + d) (0 + 2 d) (0 + 3 d)), {t, a, b}] // Together */
+        A[0] = (bfam_long_real_t)(-a*a*a*a + b*b*b*b - 8*a*a*a*d + 8*b*b*b*d
+                                  - 22*a*a*d*d + 22*b*b*d*d
+                                  - 24*a*d*d*d + 24*b*d*d*d) /
+               (bfam_long_real_t)(24*d*d*d);
 
-        /* \int_{a}^{b} t(t+2)(t+3)/(-2) dt */
-        A[1] = (3*a*a*a*a+20*a*a*a+36*a*a
-               -3*b*b*b*b-20*b*b*b-36*b*b)/24;
+        /* Integrate[(t) (t + 2 d) (t + 3 d)/((-d) (-d + 2 d) (-d + 3 d)), {t, a, b}] // Together */
+        A[1] = (bfam_long_real_t)(3*a*a*a*a - 3*b*b*b*b + 20*a*a*a*d
+                                 - 20*b*b*b*d + 36*a*a*d*d - 36*b*b*d*d) /
+               (bfam_long_real_t)(24*d*d*d);
 
-        /* \int_{a}^{b} t(t+1)(t+3)/(2) dt */
-        A[2] = (-3*a*a*a*a-16*a*a*a-18*a*a
-                +3*b*b*b*b+16*b*b*b+18*b*b)/24;
+        /* Integrate[(t) (t + d) (t + 3 d)/((-2 d) (-2 d + d) (-2 d + 3 d)), {t, a, b}] // Together */
+        A[2] = (bfam_long_real_t)(-3*a*a*a*a + 3*b*b*b*b - 16*a*a*a*d
+                                  + 16*b*b*b*d - 18*a*a*d*d + 18*b*b*d*d) /
+               (bfam_long_real_t)(24*d*d*d);
 
-        /* \int_{a}^{b} t(t+1)(t+2)/(-6) dt */
-        A[3] = (a*a*a*a+4*a*a*a+4*a*a
-               -b*b*b*b-4*b*b*b-4*b*b)/24;
+        /* Integrate[(t) (t + d) (t + 2 d)/((-3 d) (-3 d + d) (-3 d + 2 d)), {t, a, b}] // Together */
+        A[3] = (bfam_long_real_t)(a*a*a*a - b*b*b*b + 4*a*a*a*d - 4*b*b*b*d
+                                  + 4*a*a*d*d - 4*b*b*d*d) /
+               (bfam_long_real_t)(24*d*d*d);
       }
       break;
     default:
       BFAM_ABORT("Adams-Bashforth order %d not implemented",num_stages);
   }
 
-  bfam_long_real_t dt = data->dt*(1<<m_lvl);
   for(int k = 0; k < num_stages;k++)
   {
     char prefix[BFAM_BUFSIZ];
@@ -309,9 +324,9 @@ interp_fields(bfam_ts_local_adams_allprefix_t* data,
     snprintf(prefix,BFAM_BUFSIZ,"%s%d_",BFAM_LOCAL_ADAMS_PREFIX,
         (data->ts->currentStageArray[p_lvl]+data->ts->nStages-k-1)
         %data->ts->nStages);
-    BFAM_LDEBUG("Adams step: stage %d of %d using prefix %s",k,num_stages,
-        prefix);
-    data->ts->add_rates_glue_p(sub, "", "", prefix, dt*A[k]);
+    BFAM_LDEBUG("Adams interp step: stage %d of %d using prefix %s",k,
+        num_stages, prefix);
+    data->ts->add_rates_glue_p(sub, "", "", prefix, data->dt*A[k]);
   }
 }
 
