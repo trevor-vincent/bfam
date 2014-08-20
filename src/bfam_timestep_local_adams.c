@@ -649,6 +649,10 @@ bfam_ts_local_adams_init(
     const int RK_init)
 {
   BFAM_LDEBUG("LOCAL ADAMS INIT");
+#ifdef BFAM_LOCAL_ADAMS_ALWAYS_INTERP
+  BFAM_WARNING("BFAM_LOCAL_ADAMS_ALWAYS_INTERP is set which may lead to "
+               "energy instabilities due to round-off error drift");
+#endif
 
   /*
    * set up some preliminaries
