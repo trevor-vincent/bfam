@@ -706,7 +706,7 @@ get_element_order(p4est_iter_volume_info_t *info, void *arg)
 }
 
 /*
- * function to figure out what the order of that is on this processor is.
+ * function to figure out what the order of elements are on this processor.
  */
 static void
 split_domain(blade_t *blade, prefs_t *prefs)
@@ -1937,8 +1937,8 @@ run_simulation(blade_t *blade,prefs_t *prefs)
   bfam_real_t energy = initial_energy;
   if(initial_energy < BFAM_REAL_EPS) initial_energy = -1;
   BFAM_ROOT_INFO("\x1B[%dm"
-      "time: %10.5"BFAM_REAL_PRIe
-      " energy: %10.5"BFAM_REAL_PRIe
+      "time: %"BFAM_REAL_FMTe
+      " energy: %"BFAM_REAL_FMTe
       "\x1B[0m",
       34,
       0*dt,
